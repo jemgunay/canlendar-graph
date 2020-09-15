@@ -3,9 +3,10 @@ module github.com/jemgunay/canlendar-graph
 go 1.14
 
 require (
-	cloud.google.com/go v0.64.0 // indirect
-	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
-	golang.org/x/sys v0.0.0-20200824131525-c12d262b63d8 // indirect
-	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987 // indirect
-	google.golang.org/grpc v1.31.1 // indirect
+	golang.org/x/net v0.0.0-20200904194848-62affa334b73
+	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
+	golang.org/x/sys v0.0.0-20200915084602-288bc346aa39 // indirect
+	google.golang.org/api v0.31.0
+	google.golang.org/genproto v0.0.0-20200914193844-75d14daec038 // indirect
+	google.golang.org/grpc v1.32.0 // indirect
 )

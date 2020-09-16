@@ -1,55 +1,82 @@
-package canlendar
+package calendar
 
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
+
+	"golang.org/x/oauth2/google"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
 )
 
-func Start(creds []byte) error {
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(creds, calendar.CalendarReadonlyScope)
+var (
+	CalendarName = "Units Consumed"
+	credsFile    = "config/credentials.json"
+)
+
+func Fetch() ([]*calendar.Event, error) {
+	b, err := ioutil.ReadFile(credsFile)
 	if err != nil {
-		return fmt.Errorf("unable to parse client secret file to config: %s", err)
+		return nil, fmt.Errorf("unable to read client secret file: %s", err)
+	}
+
+	// If modifying these scopes, delete your previously saved token.json.
+	config, err := google.ConfigFromJSON(b, calendar.CalendarReadonlyScope)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse client secret file to config: %s", err)
 	}
 
 	client, err := getClient(config)
 	if err != nil {
-		return fmt.Errorf("failed to get client: %s", err)
+		return nil, fmt.Errorf("failed to get client: %s", err)
 	}
 
 	srv, err := calendar.New(client)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve Calendar client: %s", err)
+		return nil, fmt.Errorf("unable to retrieve Calendar client: %s", err)
 	}
 
-	t := time.Now().Format(time.RFC3339)
-	events, err := srv.Events.List("primary").ShowDeleted(false).
-		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
+	// get a list of calendars
+	list, err := srv.CalendarList.List().Do()
 	if err != nil {
-		return fmt.Errorf("unable to retrieve next ten of the user's events: %s", err)
+		return nil, fmt.Errorf("unable to retrieve calendar list: %s", err)
 	}
-	fmt.Println("Upcoming events:")
-	if len(events.Items) == 0 {
-		fmt.Println("No upcoming events found.")
-	} else {
-		for _, item := range events.Items {
-			date := item.Start.DateTime
-			if date == "" {
-				date = item.Start.Date
-			}
-			fmt.Printf("%v (%v)\n", item.Summary, date)
+
+	// iterate over all calendars and locate the corresponding ID for the target calendar name
+	var calendarID string
+	for _, item := range list.Items {
+		if CalendarName == item.Summary {
+			calendarID = item.Id
+			break
 		}
 	}
 
-	return nil
+	// validate that calendar ID was found for target calendar
+	if calendarID == "" {
+		return nil, fmt.Errorf("failed to find ID for the %s calendar", CalendarName)
+	}
+
+	// request all events for target calendar
+	req := srv.Events.List(calendarID).
+		ShowDeleted(false).
+		SingleEvents(true).
+		OrderBy("startTime")
+
+	events, err := req.Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve events: %s", err)
+	}
+
+	if len(events.Items) == 0 {
+		return nil, fmt.Errorf("no events found")
+	}
+
+	return events.Items, nil
 }
 
 // Retrieve a token, saves the token, then returns the generated client.

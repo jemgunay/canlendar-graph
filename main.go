@@ -45,11 +45,15 @@ type graphUnit struct {
 
 var re = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
 
-const recommendedWeeklyUnits = 14
+const (
+	recommendedWeeklyUnits  = 14
+	recommendedMonthlyUnits = recommendedWeeklyUnits * 4
+)
 
 // serves up JSON data to be consumed by the root page
 func dataHandler(w http.ResponseWriter, r *http.Request) {
 	// extract query string params
+	pretty := r.URL.Query().Get("pretty") == "true"
 	operation := r.URL.Query().Get("operation")
 	if operation == "" {
 		log.Println("no operation query string provided")
@@ -79,6 +83,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("failed to parse %s into datetime on event %d", date, i)
 			continue
 		}
+		dateEpoch := parsedDate.Unix() * 1000
 
 		// parse summary into units
 		match := re.FindString(item.Summary)
@@ -86,18 +91,23 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
 			continue
 		} else if match == "?" {
+			// default unknowns to recommended amount
 			match = strconv.Itoa(recommendedWeeklyUnits)
 		}
 
 		data = append(data, graphUnit{
-			X: parsedDate.Unix() * 1000,
+			X: dateEpoch,
 			Y: match,
 		})
 	}
 
+	// JSON encode response
 	w.Header().Set("Content-Type", "application/json")
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
+	if pretty {
+		encoder.SetIndent("", "\t")
+	}
 	if err := encoder.Encode(data); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)

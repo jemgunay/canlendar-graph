@@ -29,8 +29,7 @@ function drawGraph(options, data) {
                 backgroundColor: 'rgb(255, 99, 132)',
                 borderColor: 'rgb(255, 99, 132)',
                 data: data,
-                type: "line",
-
+                type: "scatter",
             }]
         },
 

@@ -31,7 +31,8 @@ function drawGraph(options, data) {
                     label: 'Units Consumed',
                     borderColor: 'rgb(255, 99, 132)',
                     backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    lineTension: 0,
+                    borderWidth: 2,
+                    lineTension: 0
                 },
                 // recommended units
                 {
@@ -40,8 +41,10 @@ function drawGraph(options, data) {
                         {y: 14, t: data[data.length - 1].t}
                     ],
                     label: 'Recommended Units',
-                    borderColor: 'rgb(81,81,81)',
-                    fill: false
+                    borderColor: 'rgb(109,109,109)',
+                    fill: false,
+                    borderWidth: 2,
+                    borderDash: [10]
                 }
             ]
         },

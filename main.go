@@ -69,7 +69,8 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	graphUnits := make([]graphUnit, 0, len(events))
+	// iterate over events and determine set of points for graph plotting
+	graphUnits := make([]graphUnit, 0)
 	var currentDateEpoch int64
 	for i, item := range events {
 		// process date
@@ -92,6 +93,9 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			graphUnits = append(graphUnits, graphUnit{
 				X: truncatedDateEpoch,
 			})
+
+			// TODO: back-fill zero unit days
+
 			currentDateEpoch = truncatedDateEpoch
 		}
 
@@ -101,11 +105,12 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		case "":
 			log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
 			continue
+
 		case "?":
 			// default unknowns to recommended amount
 			units = recommendedWeeklyUnits
+
 		default:
-			var err error
 			units, err = strconv.ParseFloat(match, 64)
 			if err != nil {
 				log.Printf("failed to parse units number from %s on event %d", item.Summary, i)

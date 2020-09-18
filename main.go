@@ -72,8 +72,11 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var firstEventDate, lastEventDate time.Time
-	eventsByWeek := make(map[int64]float64)
+	// group events by week and sum each week's units
+	var (
+		firstEventDate, lastEventDate time.Time
+		eventsByWeek                  = make(map[int64]float64)
+	)
 	for i, event := range events {
 		weekDate, units, err := processEvent(event)
 		if err != nil {
@@ -81,6 +84,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// store first and last events to calculate number of weeks
 		if i == 0 {
 			firstEventDate = weekDate
 		} else if i == len(events)-1 {
@@ -91,9 +95,11 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		eventsByWeek[epoch] = eventsByWeek[epoch] + units
 	}
 
+	// determine number of weeks (i.e. plot points) to generate
 	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/24/7) + 1
 
-	// iterate over events and determine set of points for graph plotting
+	// for each required plot point, determine the corresponding date and units from previously processed events. Plot
+	// points without a corresponding event will be defaulted to 0 units
 	graphUnits := make([]graphUnit, 0, numPlots)
 	for i := 0; i < numPlots; i++ {
 		nextWeek := firstEventDate.Add(time.Hour * 24 * 7 * time.Duration(i))

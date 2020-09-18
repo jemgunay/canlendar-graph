@@ -95,6 +95,25 @@ function drawGraph(options, data) {
     });
 }
 
+$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+    console.log(e.target) // newly activated tab
+    //e.relatedTarget // previous active tab
+
+    if ($(e.target).attr('id') === 'week-tab') {
+        newGraph({
+            operation: 'week-view',
+            title: "Units Consumed per Week",
+            canvasID: 'main-graph',
+        });
+    } else {
+        newGraph({
+            operation: 'month-view',
+            title: "Units Consumed per WMonth",
+            canvasID: 'main-graph',
+        });
+    }
+})
+
 newGraph({
     operation: 'week-view',
     title: "Units Consumed per Week",

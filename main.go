@@ -39,8 +39,8 @@ func main() {
 }
 
 type graphUnit struct {
-	X int64  `json:"t"`
-	Y string `json:"y"`
+	X int64   `json:"t"`
+	Y float64 `json:"y"`
 }
 
 var re = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
@@ -64,12 +64,13 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	// fetch calendar events
 	events, err := calendar.Fetch()
 	if err != nil {
-		log.Printf("failed to fetch data for \"%s\": %s", operation, err)
+		log.Printf("failed to fetch units for \"%s\": %s", operation, err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	data := make([]graphUnit, 0, len(events))
+	graphUnits := make([]graphUnit, 0, len(events))
+	var currentDateEpoch int64
 	for i, item := range events {
 		// process date
 		date := item.Start.DateTime
@@ -77,28 +78,42 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			date = item.Start.Date
 		}
 
-		// determine epoch (ms) from date string if the date is known for this experience
+		// determine epoch (ms) from date string if the date is known for this experience (YYYY-MM-DD)
 		parsedDate, err := time.Parse("2006-01-02", date)
 		if err != nil {
 			log.Printf("failed to parse %s into datetime on event %d", date, i)
 			continue
 		}
-		dateEpoch := parsedDate.Unix() * 1000
+		truncatedDate := parsedDate.UTC().Truncate(time.Hour * 24 * 7)
+		truncatedDateEpoch := truncatedDate.Unix() * 1000
 
-		// parse summary into units
-		match := re.FindString(item.Summary)
-		if match == "" {
-			log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
-			continue
-		} else if match == "?" {
-			// default unknowns to recommended amount
-			match = strconv.Itoa(recommendedWeeklyUnits)
+		// if week has changed, add to units set
+		if currentDateEpoch != truncatedDateEpoch {
+			graphUnits = append(graphUnits, graphUnit{
+				X: truncatedDateEpoch,
+			})
+			currentDateEpoch = truncatedDateEpoch
 		}
 
-		data = append(data, graphUnit{
-			X: dateEpoch,
-			Y: match,
-		})
+		// parse summary into units
+		var units float64
+		switch match := re.FindString(item.Summary); match {
+		case "":
+			log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
+			continue
+		case "?":
+			// default unknowns to recommended amount
+			units = recommendedWeeklyUnits
+		default:
+			var err error
+			units, err = strconv.ParseFloat(match, 64)
+			if err != nil {
+				log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
+				continue
+			}
+		}
+
+		graphUnits[len(graphUnits)-1].Y += units
 	}
 
 	// JSON encode response
@@ -108,7 +123,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	if pretty {
 		encoder.SetIndent("", "\t")
 	}
-	if err := encoder.Encode(data); err != nil {
+	if err := encoder.Encode(graphUnits); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}

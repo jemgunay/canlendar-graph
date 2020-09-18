@@ -3,11 +3,14 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
+
+	gcal "google.golang.org/api/calendar/v3"
 
 	"github.com/jemgunay/canlendar-graph/calendar"
 )
@@ -69,56 +72,37 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// iterate over events and determine set of points for graph plotting
-	graphUnits := make([]graphUnit, 0)
-	var currentDateEpoch int64
-	for i, item := range events {
-		// process date
-		date := item.Start.DateTime
-		if date == "" {
-			date = item.Start.Date
-		}
-
-		// determine epoch (ms) from date string if the date is known for this experience (YYYY-MM-DD)
-		parsedDate, err := time.Parse("2006-01-02", date)
+	var firstEventDate, lastEventDate time.Time
+	eventsByWeek := make(map[int64]float64)
+	for i, event := range events {
+		weekDate, units, err := processEvent(event)
 		if err != nil {
-			log.Printf("failed to parse %s into datetime on event %d", date, i)
+			log.Printf("failed to parse event date for index %d", i)
 			continue
 		}
-		truncatedDate := parsedDate.UTC().Truncate(time.Hour * 24 * 7)
-		truncatedDateEpoch := truncatedDate.Unix() * 1000
 
-		// if week has changed, add to units set
-		if currentDateEpoch != truncatedDateEpoch {
-			graphUnits = append(graphUnits, graphUnit{
-				X: truncatedDateEpoch,
-			})
-
-			// TODO: back-fill zero unit days
-
-			currentDateEpoch = truncatedDateEpoch
+		if i == 0 {
+			firstEventDate = weekDate
+		} else if i == len(events)-1 {
+			lastEventDate = weekDate
 		}
 
-		// parse summary into units
-		var units float64
-		switch match := re.FindString(item.Summary); match {
-		case "":
-			log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
-			continue
+		epoch := weekDate.Unix() * 1000
+		eventsByWeek[epoch] = eventsByWeek[epoch] + units
+	}
 
-		case "?":
-			// default unknowns to recommended amount
-			units = recommendedWeeklyUnits
+	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/24/7) + 1
 
-		default:
-			units, err = strconv.ParseFloat(match, 64)
-			if err != nil {
-				log.Printf("failed to parse units number from %s on event %d", item.Summary, i)
-				continue
-			}
-		}
+	// iterate over events and determine set of points for graph plotting
+	graphUnits := make([]graphUnit, 0, numPlots)
+	for i := 0; i < numPlots; i++ {
+		nextWeek := firstEventDate.Add(time.Hour * 24 * 7 * time.Duration(i))
+		epoch := nextWeek.Unix() * 1000
 
-		graphUnits[len(graphUnits)-1].Y += units
+		graphUnits = append(graphUnits, graphUnit{
+			X: epoch,
+			Y: eventsByWeek[epoch],
+		})
 	}
 
 	// JSON encode response
@@ -132,4 +116,39 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+func processEvent(event *gcal.Event) (time.Time, float64, error) {
+	date := event.Start.DateTime
+	if date == "" {
+		date = event.Start.Date
+	}
+
+	// parse date from string
+	parsedTime, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return time.Time{}, 0, err
+	}
+
+	// truncate date to week
+	weekTrunc := parsedTime.UTC().Truncate(time.Hour * 24 * 7)
+
+	// parse summary into units
+	var units float64
+	switch match := re.FindString(event.Summary); match {
+	case "":
+		return time.Time{}, 0, fmt.Errorf("failed to find a units number for event: %s", event.Summary)
+
+	case "?":
+		// default unknowns to recommended amount
+		units = recommendedWeeklyUnits
+
+	default:
+		units, err = strconv.ParseFloat(match, 64)
+		if err != nil {
+			return time.Time{}, 0, fmt.Errorf("failed to parse units number from event %s", event.Summary)
+		}
+	}
+
+	return weekTrunc, units, nil
 }

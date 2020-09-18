@@ -7,11 +7,10 @@ import (
 	"net/http"
 	"os"
 
-	"golang.org/x/oauth2/google"
-
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/calendar/v3"
+	"golang.org/x/oauth2/google"
+	gcal "google.golang.org/api/calendar/v3"
 )
 
 var (
@@ -19,14 +18,14 @@ var (
 	credsFile    = "config/credentials.json"
 )
 
-func Fetch() ([]*calendar.Event, error) {
+func Fetch() ([]*gcal.Event, error) {
 	b, err := ioutil.ReadFile(credsFile)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %s", err)
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, calendar.CalendarReadonlyScope)
+	config, err := google.ConfigFromJSON(b, gcal.CalendarReadonlyScope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %s", err)
 	}
@@ -36,7 +35,7 @@ func Fetch() ([]*calendar.Event, error) {
 		return nil, fmt.Errorf("failed to get client: %s", err)
 	}
 
-	srv, err := calendar.New(client)
+	srv, err := gcal.New(client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve Calendar client: %s", err)
 	}

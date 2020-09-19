@@ -96,8 +96,7 @@ function drawGraph(options, data) {
 }
 
 $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-    console.log(e.target) // newly activated tab
-    //e.relatedTarget // previous active tab
+    console.log(e.target)
 
     if ($(e.target).attr('id') === 'week-tab') {
         newGraph({
@@ -108,7 +107,7 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
     } else {
         newGraph({
             operation: 'month-view',
-            title: "Units Consumed per WMonth",
+            title: "Units Consumed per Month",
             canvasID: 'main-graph',
         });
     }

@@ -57,9 +57,9 @@ const (
 func dataHandler(w http.ResponseWriter, r *http.Request) {
 	// extract query string params
 	pretty := r.URL.Query().Get("pretty") == "true"
-	operation := r.URL.Query().Get("operation")
-	if operation == "" {
-		log.Println("no operation query string provided")
+	view := r.URL.Query().Get("view")
+	if view == "" {
+		log.Println("no view query string provided")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -67,7 +67,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	// fetch calendar events
 	events, err := calendar.Fetch()
 	if err != nil {
-		log.Printf("failed to fetch units for \"%s\": %s", operation, err)
+		log.Printf("failed to fetch units for \"%s\": %s", view, err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

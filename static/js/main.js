@@ -1,11 +1,11 @@
 function newGraph(options) {
     // fetch graph data from server
     $.ajax({
-        url: '/data?operation=' + options.operation,
+        url: '/data?view=' + options.view,
         type: 'GET',
         dataType: 'json',
         error: function (e) {
-            alert('failed to retrieve ' + options.operation + ' data (' + e.status + ')')
+            alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
         },
         success: function (data) {
             console.log(data);
@@ -100,13 +100,13 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
 
     if ($(e.target).attr('id') === 'week-tab') {
         newGraph({
-            operation: 'week-view',
+            view: 'week',
             title: "Units Consumed per Week",
             canvasID: 'main-graph',
         });
     } else {
         newGraph({
-            operation: 'month-view',
+            view: 'month',
             title: "Units Consumed per Month",
             canvasID: 'main-graph',
         });
@@ -114,7 +114,7 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
 })
 
 newGraph({
-    operation: 'week-view',
+    view: 'week',
     title: "Units Consumed per Week",
     canvasID: 'main-graph',
 });

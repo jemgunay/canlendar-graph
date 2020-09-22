@@ -13,18 +13,15 @@ import (
 	gcal "google.golang.org/api/calendar/v3"
 )
 
-var (
-	CalendarName = "Units Consumed"
-	credsFile    = "config/credentials.json"
-)
+var Name = "Units Consumed"
 
 func Fetch() ([]*gcal.Event, error) {
-	b, err := ioutil.ReadFile(credsFile)
+	b, err := ioutil.ReadFile("config/credentials.json")
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %s", err)
 	}
 
-	// If modifying these scopes, delete your previously saved token.json.
+	// If modifying these scopes, delete your previously saved token.json
 	config, err := google.ConfigFromJSON(b, gcal.CalendarReadonlyScope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %s", err)
@@ -49,7 +46,7 @@ func Fetch() ([]*gcal.Event, error) {
 	// iterate over all calendars and locate the corresponding ID for the target calendar name
 	var calendarID string
 	for _, item := range list.Items {
-		if CalendarName == item.Summary {
+		if Name == item.Summary {
 			calendarID = item.Id
 			break
 		}
@@ -57,7 +54,7 @@ func Fetch() ([]*gcal.Event, error) {
 
 	// validate that calendar ID was found for target calendar
 	if calendarID == "" {
-		return nil, fmt.Errorf("failed to find ID for the %s calendar", CalendarName)
+		return nil, fmt.Errorf("failed to find ID for the %s calendar", Name)
 	}
 
 	// request all events for target calendar

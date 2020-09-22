@@ -16,9 +16,15 @@ function newGraph(options) {
     });
 }
 
+let currentChart = null
+
 function drawGraph(options, data) {
+    if (currentChart !== null) {
+        currentChart.destroy();
+    }
+
     let ctx = document.getElementById(options.canvasID).getContext('2d');
-    let chart = new Chart(ctx, {
+    currentChart = new Chart(ctx, {
         // The type of chart we want to create
         type: 'line',
 

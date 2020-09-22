@@ -18,7 +18,7 @@ import (
 func main() {
 	// process flags
 	port := flag.Int("port", 8080, "the HTTP server port")
-	flag.StringVar(&calendar.CalendarName, "calendar_name", calendar.CalendarName, "the units consumed calendar name")
+	flag.StringVar(&calendar.Name, "calendar_name", calendar.Name, "the units consumed calendar name")
 	flag.Parse()
 
 	// define handlers
@@ -76,13 +76,17 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		firstEventDate, lastEventDate time.Time
 		eventsByWeek                  = make(map[int64]float64)
+		scale                         = time.Hour * 24 * 7
 	)
 	for i, event := range events {
-		weekDate, units, err := processEvent(event)
+		date, units, err := processEvent(event)
 		if err != nil {
 			log.Printf("failed to parse event date for index %d", i)
 			continue
 		}
+
+		// truncate date to week
+		weekDate := date.UTC().Truncate(scale)
 
 		// store first and last events to calculate number of weeks
 		if i == 0 {
@@ -96,13 +100,13 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// determine number of weeks (i.e. plot points) to generate
-	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/24/7) + 1
+	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
 
 	// for each required plot point, determine the corresponding date and units from previously processed events. Plot
 	// points without a corresponding event will be defaulted to 0 units
 	graphUnits := make([]graphUnit, 0, numPlots)
 	for i := 0; i < numPlots; i++ {
-		nextWeek := firstEventDate.Add(time.Hour * 24 * 7 * time.Duration(i))
+		nextWeek := firstEventDate.Add(scale * time.Duration(i))
 		epoch := nextWeek.Unix() * 1000
 
 		graphUnits = append(graphUnits, graphUnit{
@@ -136,9 +140,6 @@ func processEvent(event *gcal.Event) (time.Time, float64, error) {
 		return time.Time{}, 0, err
 	}
 
-	// truncate date to week
-	weekTrunc := parsedTime.UTC().Truncate(time.Hour * 24 * 7)
-
 	// parse summary into units
 	var units float64
 	switch match := re.FindString(event.Summary); match {
@@ -156,5 +157,5 @@ func processEvent(event *gcal.Event) (time.Time, float64, error) {
 		}
 	}
 
-	return weekTrunc, units, nil
+	return parsedTime, units, nil
 }

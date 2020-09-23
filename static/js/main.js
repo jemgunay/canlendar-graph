@@ -1,3 +1,10 @@
+function toTitleCase(str) {
+    return str.replace(/\w\S*/g, function (txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        }
+    );
+}
+
 function newGraph(options) {
     // fetch graph data from server
     $.ajax({
@@ -42,14 +49,14 @@ function drawGraph(options, data) {
         options: {
             title: {
                 display: true,
-                text: options.title
+                text: 'Units Consumed per ' + toTitleCase(options.view)
             },
             responsive: true,
             scales: {
                 xAxes: [{
                     scaleLabel: {
                         display: true,
-                        labelString: options.view[0].toUpperCase() + options.view.substring(1)
+                        labelString: toTitleCase(options.view)
                     },
                     type: 'time',
                     ticks: {
@@ -90,7 +97,7 @@ function drawGraph(options, data) {
                 {y: data.config.guideline, t: data.plots[0].t},
                 {y: data.config.guideline, t: data.plots[data.plots.length - 1].t}
             ],
-            label: 'UK Guideline Units',
+            label: 'Units Guideline (UK)',
             borderColor: 'rgb(109,109,109)',
             fill: false,
             borderWidth: 2,
@@ -109,7 +116,6 @@ function selectGraph(view) {
             newGraph({
                 view: 'month',
                 type: 'line',
-                title: 'Units Consumed per Month',
                 enableGuideline: true
             });
             break;
@@ -117,7 +123,6 @@ function selectGraph(view) {
             newGraph({
                 view: 'week',
                 type: 'line',
-                title: 'Units Consumed per Week',
                 enableGuideline: true
             });
             break;
@@ -125,7 +130,6 @@ function selectGraph(view) {
             newGraph({
                 view: 'day',
                 type: 'scatter',
-                title: 'Units Consumed per Day',
             });
             break;
     }

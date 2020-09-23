@@ -1,7 +1,6 @@
 package calendar
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -23,22 +22,28 @@ const (
 	Day
 )
 
-func (r *Results) GetPlots(scale scale) {
+type Plot struct {
+	X int64   `json:"t"`
+	Y float64 `json:"y"`
+}
+
+func (r *Results) GeneratePlots(scale scale) []Plot {
 	// group Events by week and sum each set of units
 	var (
 		firstEventDate, lastEventDate time.Time
-		eventsByWeek                  = make(map[int64]float64)
+		eventsByInterval              = make(map[int64]float64)
 	)
 
 	// determine number of plots points required based on scale and first/last dates
 	for i, event := range r.Events {
 		date, units, err := processEvent(event)
-		switch err {
-		case ErrUnspecifiedUnitCount:
-			units = 14 // TODO: fix this
-		default:
-			log.Printf("failed to parse event date for index %d", i)
+		if err != nil {
+			log.Printf("failed to parse event date for index %d: %s", i, err)
 			continue
+		}
+
+		if units == -1 {
+			units = 14 // TODO: get this from elsewhere
 		}
 
 		// truncate date to scale
@@ -60,14 +65,15 @@ func (r *Results) GetPlots(scale scale) {
 		}
 
 		epoch := truncDate.Unix() * 1000
-		eventsByWeek[epoch] = eventsByWeek[epoch] + units
+		eventsByInterval[epoch] = eventsByInterval[epoch] + units
 	}
 
 	// determine number of required plot points to generate
 	var numPlots int
 	switch scale {
 	case Month:
-		numPlots = int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
+		yy, mm, _, _, _, _ := diff(firstEventDate, lastEventDate)
+		numPlots = yy*12 + mm + 1
 	case Week:
 		numPlots = int(lastEventDate.Sub(firstEventDate).Hours()/24/7) + 1
 	case Day:
@@ -76,16 +82,27 @@ func (r *Results) GetPlots(scale scale) {
 
 	// for each required plot point, determine the corresponding date and units from previously processed events. Plot
 	// points without a corresponding event will be defaulted to 0 units
-	plots := make([]plot, 0, numPlots)
+	plots := make([]Plot, 0, numPlots)
 	for i := 0; i < numPlots; i++ {
-		nextWeek := firstEventDate.Add(scale * time.Duration(i))
-		epoch := nextWeek.Unix() * 1000
+		var nextDate time.Time
+		switch scale {
+		case Month:
+			nextDate = firstEventDate.AddDate(0, 1*i, 0)
+		case Week:
+			nextDate = firstEventDate.AddDate(0, 0, 7*i)
+		case Day:
+			nextDate = firstEventDate.AddDate(0, 0, 1*i)
+		}
 
-		plots = append(plots, plot{
+		epoch := nextDate.Unix() * 1000
+
+		plots = append(plots, Plot{
 			X: epoch,
-			Y: eventsByWeek[epoch],
+			Y: eventsByInterval[epoch],
 		})
 	}
+
+	return plots
 }
 
 func diff(a, b time.Time) (year, month, day, hour, min, sec int) {
@@ -134,11 +151,10 @@ func diff(a, b time.Time) (year, month, day, hour, min, sec int) {
 	return
 }
 
-var (
-	re                      = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
-	ErrUnspecifiedUnitCount = errors.New("unknown units documented")
-)
+var summaryUnitsRegex = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
 
+// processEvent processes the date and number of units from the calendar event. Returns a units count of -1 if the unit
+// amount was specified as unknown in the event summary, i.e. "?" instead of a number
 func processEvent(event *gcal.Event) (time.Time, float64, error) {
 	date := event.Start.DateTime
 	if date == "" {
@@ -153,14 +169,17 @@ func processEvent(event *gcal.Event) (time.Time, float64, error) {
 
 	// parse summary into units
 	var units float64
-	switch match := re.FindString(event.Summary); match {
+	switch match := summaryUnitsRegex.FindString(event.Summary); match {
 	case "":
+		// invalid summary provided
 		return time.Time{}, 0, fmt.Errorf("failed to find a units number for event: %s", event.Summary)
 
 	case "?":
-		return time.Time{}, 0, ErrUnspecifiedUnitCount
+		// indicates that the consumed number of units was unknown
+		units = -1
 
 	default:
+		// parse number of units into float
 		units, err = strconv.ParseFloat(match, 64)
 		if err != nil {
 			return time.Time{}, 0, fmt.Errorf("failed to parse units number from event %s", event.Summary)

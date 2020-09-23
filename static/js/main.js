@@ -8,6 +8,7 @@ function newGraph(options) {
             alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
         },
         success: function (data) {
+            console.log(data);
             drawGraph(options, data);
         }
     });
@@ -22,7 +23,7 @@ function drawGraph(options, data) {
     }
 
     let chartConfig = {
-        type: 'line',
+        type: options.type,
 
         // the data for our dataset
         data: {
@@ -48,7 +49,7 @@ function drawGraph(options, data) {
                 xAxes: [{
                     scaleLabel: {
                         display: true,
-                        labelString: options.unit[0].toUpperCase() + options.unit.substring(1)
+                        labelString: options.view[0].toUpperCase() + options.view.substring(1)
                     },
                     type: 'time',
                     ticks: {
@@ -89,7 +90,7 @@ function drawGraph(options, data) {
                 {y: data.config.guideline, t: data.plots[0].t},
                 {y: data.config.guideline, t: data.plots[data.plots.length - 1].t}
             ],
-            label: 'UK Units Guideline',
+            label: 'UK Guideline Units',
             borderColor: 'rgb(109,109,109)',
             fill: false,
             borderWidth: 2,
@@ -102,30 +103,39 @@ function drawGraph(options, data) {
     currentChart = new Chart(ctx, chartConfig)
 }
 
-$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-    switch ($(e.target).attr('id')) {
-        case 'month-tab':
+function selectGraph(view) {
+    switch (view) {
+        case 'month':
             newGraph({
                 view: 'month',
+                type: 'line',
                 title: 'Units Consumed per Month',
-                unit: 'month',
                 enableGuideline: true
             });
             break;
-        case 'week-tab':
+        case 'week':
             newGraph({
                 view: 'week',
+                type: 'line',
                 title: 'Units Consumed per Week',
-                unit: 'week',
                 enableGuideline: true
             });
             break;
-        case 'day-tab':
+        case 'day':
             newGraph({
                 view: 'day',
+                type: 'scatter',
                 title: 'Units Consumed per Day',
-                unit: 'day'
             });
             break;
     }
+}
+
+// listen for nav bar tab switch to trigger graph creation
+$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+    let id = $(e.target).attr('id');
+    selectGraph(id.substring(0, id.length - 4));
 })
+
+// draw initial graph
+selectGraph('month')

@@ -13,9 +13,7 @@ import (
 	gcal "google.golang.org/api/calendar/v3"
 )
 
-var Name = "Units Consumed"
-
-func Fetch() ([]*gcal.Event, error) {
+func Fetch(calendarName string) (*Results, error) {
 	b, err := ioutil.ReadFile("config/credentials.json")
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %s", err)
@@ -46,7 +44,7 @@ func Fetch() ([]*gcal.Event, error) {
 	// iterate over all calendars and locate the corresponding ID for the target calendar name
 	var calendarID string
 	for _, item := range list.Items {
-		if Name == item.Summary {
+		if calendarName == item.Summary {
 			calendarID = item.Id
 			break
 		}
@@ -54,10 +52,10 @@ func Fetch() ([]*gcal.Event, error) {
 
 	// validate that calendar ID was found for target calendar
 	if calendarID == "" {
-		return nil, fmt.Errorf("failed to find ID for the %s calendar", Name)
+		return nil, fmt.Errorf("failed to find ID for the %s calendar", calendarName)
 	}
 
-	// request all events for target calendar
+	// request all Events for target calendar
 	req := srv.Events.List(calendarID).
 		ShowDeleted(false).
 		SingleEvents(true).
@@ -65,14 +63,16 @@ func Fetch() ([]*gcal.Event, error) {
 
 	events, err := req.Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve events: %s", err)
+		return nil, fmt.Errorf("unable to retrieve Events: %s", err)
 	}
 
 	if len(events.Items) == 0 {
-		return nil, fmt.Errorf("no events found")
+		return nil, fmt.Errorf("no Events found")
 	}
 
-	return events.Items, nil
+	return &Results{
+		Events: events.Items,
+	}, nil
 }
 
 // Retrieve a token, saves the token, then returns the generated client.

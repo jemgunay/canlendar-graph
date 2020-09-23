@@ -3,22 +3,20 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
-
-	gcal "google.golang.org/api/calendar/v3"
 
 	"github.com/jemgunay/canlendar-graph/calendar"
 )
 
+var calendarName = "Units Consumed"
+
 func main() {
 	// process flags
 	port := flag.Int("port", 8080, "the HTTP server port")
-	flag.StringVar(&calendar.Name, "calendar_name", calendar.Name, "the units consumed calendar name")
+	flag.StringVar(&calendarName, "calendar_name", calendarName, "the name of the calendar documenting units")
 	flag.Parse()
 
 	// define handlers
@@ -51,8 +49,6 @@ type plot struct {
 	Y float64 `json:"y"`
 }
 
-var re = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
-
 const recommendedWeeklyUnits = 14
 
 // serves up JSON data to be consumed by the root page
@@ -67,7 +63,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// fetch calendar events
-	events, err := calendar.Fetch()
+	events, err := calendar.Fetch(calendarName)
 	if err != nil {
 		log.Printf("failed to fetch units for \"%s\": %s", view, err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -92,9 +88,13 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		scale *= 7
 	}
 
+	// TODO: determine number of plots points required based on first, last and scale
 	for i, event := range events {
 		date, units, err := processEvent(event)
-		if err != nil {
+		switch err {
+		case calendar.ErrUnspecifiedUnitCount:
+			units = guidelineUnits
+		default:
 			log.Printf("failed to parse event date for index %d", i)
 			continue
 		}
@@ -113,13 +113,14 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		eventsByWeek[epoch] = eventsByWeek[epoch] + units
 	}
 
-	// determine number of weeks (i.e. plot points) to generate
-	numUnits := int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
+	// determine number of plot points to generate
+	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
 
+	// TODO:
 	// for each required plot point, determine the corresponding date and units from previously processed events. Plot
 	// points without a corresponding event will be defaulted to 0 units
-	plots := make([]plot, 0, numUnits)
-	for i := 0; i < numUnits; i++ {
+	plots := make([]plot, 0, numPlots)
+	for i := 0; i < numPlots; i++ {
 		nextWeek := firstEventDate.Add(scale * time.Duration(i))
 		epoch := nextWeek.Unix() * 1000
 
@@ -148,36 +149,4 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func processEvent(event *gcal.Event) (time.Time, float64, error) {
-	date := event.Start.DateTime
-	if date == "" {
-		date = event.Start.Date
-	}
-
-	// parse date from string
-	parsedTime, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return time.Time{}, 0, err
-	}
-
-	// parse summary into units
-	var units float64
-	switch match := re.FindString(event.Summary); match {
-	case "":
-		return time.Time{}, 0, fmt.Errorf("failed to find a units number for event: %s", event.Summary)
-
-	case "?":
-		// default unknowns to recommended amount
-		units = recommendedWeeklyUnits
-
-	default:
-		units, err = strconv.ParseFloat(match, 64)
-		if err != nil {
-			return time.Time{}, 0, fmt.Errorf("failed to parse units number from event %s", event.Summary)
-		}
-	}
-
-	return parsedTime, units, nil
 }

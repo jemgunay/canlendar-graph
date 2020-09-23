@@ -41,17 +41,19 @@ func main() {
 	log.Printf("server shut down: %s", err)
 }
 
-type graphUnit struct {
+type graphResponse struct {
+	Plots  []plot            `json:"plots"`
+	Config map[string]string `json:"config"`
+}
+
+type plot struct {
 	X int64   `json:"t"`
 	Y float64 `json:"y"`
 }
 
 var re = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
 
-const (
-	recommendedWeeklyUnits  = 14
-	recommendedMonthlyUnits = recommendedWeeklyUnits * 4
-)
+const recommendedWeeklyUnits = 14
 
 // serves up JSON data to be consumed by the root page
 func dataHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,12 +74,24 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// group events by week and sum each week's units
+	guidelineUnits := recommendedWeeklyUnits
+
+	if view == "month" {
+		guidelineUnits *= 4
+		return
+	}
+
+	// group events by week and sum each set of units
 	var (
 		firstEventDate, lastEventDate time.Time
 		eventsByWeek                  = make(map[int64]float64)
-		scale                         = time.Hour * 24 * 7
+		scale                         = time.Hour * 24
 	)
+
+	if view == "week" {
+		scale *= 7
+	}
+
 	for i, event := range events {
 		date, units, err := processEvent(event)
 		if err != nil {
@@ -85,34 +99,42 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// truncate date to week
-		weekDate := date.UTC().Truncate(scale)
+		// truncate date to scale
+		truncDate := date.UTC().Truncate(scale)
 
-		// store first and last events to calculate number of weeks
+		// store first and last events to calculate total plot count
 		if i == 0 {
-			firstEventDate = weekDate
+			firstEventDate = truncDate
 		} else if i == len(events)-1 {
-			lastEventDate = weekDate
+			lastEventDate = truncDate
 		}
 
-		epoch := weekDate.Unix() * 1000
+		epoch := truncDate.Unix() * 1000
 		eventsByWeek[epoch] = eventsByWeek[epoch] + units
 	}
 
 	// determine number of weeks (i.e. plot points) to generate
-	numPlots := int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
+	numUnits := int(lastEventDate.Sub(firstEventDate).Hours()/scale.Hours()) + 1
 
 	// for each required plot point, determine the corresponding date and units from previously processed events. Plot
 	// points without a corresponding event will be defaulted to 0 units
-	graphUnits := make([]graphUnit, 0, numPlots)
-	for i := 0; i < numPlots; i++ {
+	plots := make([]plot, 0, numUnits)
+	for i := 0; i < numUnits; i++ {
 		nextWeek := firstEventDate.Add(scale * time.Duration(i))
 		epoch := nextWeek.Unix() * 1000
 
-		graphUnits = append(graphUnits, graphUnit{
+		plots = append(plots, plot{
 			X: epoch,
 			Y: eventsByWeek[epoch],
 		})
+	}
+
+	// construct response
+	resp := graphResponse{
+		Plots: plots,
+		Config: map[string]string{
+			"guideline": strconv.Itoa(guidelineUnits),
+		},
 	}
 
 	// JSON encode response
@@ -122,7 +144,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	if pretty {
 		encoder.SetIndent("", "\t")
 	}
-	if err := encoder.Encode(graphUnits); err != nil {
+	if err := encoder.Encode(resp); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}

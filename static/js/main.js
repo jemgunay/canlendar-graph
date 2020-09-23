@@ -8,9 +8,6 @@ function newGraph(options) {
             alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
         },
         success: function (data) {
-            console.log(data);
-
-            // draw graph
             drawGraph(options, data);
         }
     });
@@ -19,43 +16,28 @@ function newGraph(options) {
 let currentChart = null
 
 function drawGraph(options, data) {
+    // clean up previous chart
     if (currentChart !== null) {
         currentChart.destroy();
     }
 
-    let ctx = document.getElementById(options.canvasID).getContext('2d');
-    currentChart = new Chart(ctx, {
-        // The type of chart we want to create
+    let chartConfig = {
         type: 'line',
 
-        // The data for our dataset
+        // the data for our dataset
         data: {
-            datasets: [
+            datasets: [{
                 // units consumed line
-                {
-                    data: data,
-                    label: 'Units Consumed',
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderWidth: 2,
-                    lineTension: 0
-                },
-                // recommended units
-                {
-                    data: [
-                        {y: 14, t: data[0].t},
-                        {y: 14, t: data[data.length - 1].t}
-                    ],
-                    label: 'Recommended Units',
-                    borderColor: 'rgb(109,109,109)',
-                    fill: false,
-                    borderWidth: 2,
-                    borderDash: [10]
-                }
-            ]
+                data: data.plots,
+                label: 'Units Consumed',
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                borderWidth: 2,
+                lineTension: 0
+            }]
         },
 
-        // Configuration options go here
+        // configuration options go here
         options: {
             title: {
                 display: true,
@@ -66,14 +48,14 @@ function drawGraph(options, data) {
                 xAxes: [{
                     scaleLabel: {
                         display: true,
-                        labelString: 'Week'
+                        labelString: options.unit[0].toUpperCase() + options.unit.substring(1)
                     },
                     type: 'time',
                     ticks: {
                         source: 'auto',
                     },
                     time: {
-                        unit: 'week',
+                        unit: options.unit,
                         isoWeekday: true,
                         displayFormats: {
                             quarter: 'MMM YYYY'
@@ -98,29 +80,52 @@ function drawGraph(options, data) {
                 position: 'right'
             }
         }
-    });
+    };
+
+    // display UK units guideline
+    if (options.enableGuideline === true) {
+        chartConfig.data.datasets.push({
+            data: [
+                {y: data.config.guideline, t: data.plots[0].t},
+                {y: data.config.guideline, t: data.plots[data.plots.length - 1].t}
+            ],
+            label: 'UK Units Guideline',
+            borderColor: 'rgb(109,109,109)',
+            fill: false,
+            borderWidth: 2,
+            borderDash: [10]
+        });
+    }
+
+    // create new chart
+    let ctx = document.getElementById('main-graph').getContext('2d');
+    currentChart = new Chart(ctx, chartConfig)
 }
 
 $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-    console.log(e.target)
-
-    if ($(e.target).attr('id') === 'week-tab') {
-        newGraph({
-            view: 'week',
-            title: "Units Consumed per Week",
-            canvasID: 'main-graph',
-        });
-    } else {
-        newGraph({
-            view: 'month',
-            title: "Units Consumed per Month",
-            canvasID: 'main-graph',
-        });
+    switch ($(e.target).attr('id')) {
+        case 'month-tab':
+            newGraph({
+                view: 'month',
+                title: 'Units Consumed per Month',
+                unit: 'month',
+                enableGuideline: true
+            });
+            break;
+        case 'week-tab':
+            newGraph({
+                view: 'week',
+                title: 'Units Consumed per Week',
+                unit: 'week',
+                enableGuideline: true
+            });
+            break;
+        case 'day-tab':
+            newGraph({
+                view: 'day',
+                title: 'Units Consumed per Day',
+                unit: 'day'
+            });
+            break;
     }
 })
-
-newGraph({
-    view: 'week',
-    title: "Units Consumed per Week",
-    canvasID: 'main-graph',
-});

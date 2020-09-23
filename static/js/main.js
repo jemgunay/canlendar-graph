@@ -63,10 +63,12 @@ function drawGraph(options, data) {
                         source: 'auto',
                     },
                     time: {
-                        unit: options.unit,
+                        unit: options.view,
                         isoWeekday: true,
                         displayFormats: {
-                            quarter: 'MMM YYYY'
+                            month: 'MMM YYYY',
+                            week: 'D MMM (ww)',
+                            day: 'D MMM'
                         }
                     }
                 }],

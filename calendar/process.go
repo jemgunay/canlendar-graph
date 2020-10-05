@@ -54,7 +54,7 @@ func (r *Results) GeneratePlots(scale scale) []Plot {
 		var truncDate time.Time
 		switch scale {
 		case Month:
-			truncDate = time.Date(date.Year(), date.Month(), 0, 0, 0, 0, 0, date.Location())
+			truncDate = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, time.UTC)
 		case Week:
 			truncDate = date.Truncate(time.Hour * 24 * 7)
 		case Day:

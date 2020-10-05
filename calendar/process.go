@@ -10,23 +10,27 @@ import (
 	gcal "google.golang.org/api/calendar/v3"
 )
 
+// Results is a calendar events result set.
 type Results struct {
 	Events []*gcal.Event
 }
 
 type scale int
 
+// Scale variants for sourcing plot generation.
 const (
 	Month scale = iota
 	Week
 	Day
 )
 
+// Plot is a point on a graph.
 type Plot struct {
 	X int64   `json:"t"`
 	Y float64 `json:"y"`
 }
 
+// GeneratePlots generates graph plot data for a given time scale.
 func (r *Results) GeneratePlots(scale scale) []Plot {
 	// group Events by week and sum each set of units
 	var (

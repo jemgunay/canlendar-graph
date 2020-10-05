@@ -13,6 +13,7 @@ import (
 	gcal "google.golang.org/api/calendar/v3"
 )
 
+// Fetch fetches a set of events for a given calendar name.
 func Fetch(calendarName string) (*Results, error) {
 	b, err := ioutil.ReadFile("config/credentials.json")
 	if err != nil {

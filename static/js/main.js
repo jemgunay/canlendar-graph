@@ -15,7 +15,9 @@ function newGraph(options) {
             alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
         },
         success: function (data) {
-            console.log(data);
+            if (typeof options.filterFunc === "function") {
+                data.plots = data.plots.filter(options.filterFunc);
+            }
             drawGraph(options, data);
         }
     });
@@ -132,6 +134,9 @@ function selectGraph(view) {
             newGraph({
                 view: 'day',
                 type: 'scatter',
+                filterFunc: function(plot) {
+                    return plot.y !== 0;
+                }
             });
             break;
     }

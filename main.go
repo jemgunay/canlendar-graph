@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/mux"
 	"github.com/jemgunay/canlendar-graph/calendar"
 )
 
@@ -19,23 +20,19 @@ func main() {
 	flag.Parse()
 
 	// define handlers
+	router := mux.NewRouter()
+	router.HandleFunc("/api/v1/data/{view}", dataHandler)
 	staticFileHandler := http.StripPrefix("/static/", http.FileServer(http.Dir("static/")))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// reroute calls to the root to index.html via the file server
-		if r.URL.Path != "/" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = "/static/"
 		staticFileHandler.ServeHTTP(w, r)
 	})
-	http.Handle("/static/", staticFileHandler)
-	http.HandleFunc("/data", dataHandler)
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	// start HTTP server
-	log.Printf("starting up HTTP server on port %d", *port)
-	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
-	log.Printf("server shut down: %s", err)
+	log.Printf("starting HTTP server on port %d", *port)
+	err := http.ListenAndServe(":"+strconv.Itoa(*port), router)
+	log.Printf("HTTP server shut down: %s", err)
 }
 
 type graphResponse struct {
@@ -43,15 +40,29 @@ type graphResponse struct {
 	Config map[string]string `json:"config"`
 }
 
+// TODO: get this from elsewhere, i.e. DB driven by config page, persisted in memory
 const recommendedWeeklyUnits = 14
 
 // serves up JSON data to be consumed by the root page
 func dataHandler(w http.ResponseWriter, r *http.Request) {
-	// extract query string params
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// extract URL/query string params
 	pretty := r.URL.Query().Get("pretty") == "true"
-	view := r.URL.Query().Get("view")
+	vars := mux.Vars(r)
+	view := vars["view"]
 	if view == "" {
-		log.Println("no view query string provided")
+		log.Println("no view string provided in URL route")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	scale, err := calendar.ValidateScale(view)
+	if err != nil {
+		log.Printf("failed to parse ")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -59,13 +70,13 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	// fetch calendar events
 	events, err := calendar.Fetch(calendarName)
 	if err != nil {
-		log.Printf("failed to fetch units for \"%s\": %s", view, err)
+		log.Printf("failed to fetch units for \"%s\": %s", scale, err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	guidelineUnits := recommendedWeeklyUnits
-	if view == "month" {
+	if scale == calendar.Month {
 		guidelineUnits *= 4
 	}
 
@@ -74,15 +85,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		Config: map[string]string{
 			"guideline": strconv.Itoa(guidelineUnits),
 		},
-	}
-
-	switch view {
-	case "month":
-		resp.Plots = events.GeneratePlots(calendar.Month)
-	case "week":
-		resp.Plots = events.GeneratePlots(calendar.Week)
-	case "day":
-		resp.Plots = events.GeneratePlots(calendar.Day)
+		Plots: events.GeneratePlots(scale),
 	}
 
 	// JSON encode response

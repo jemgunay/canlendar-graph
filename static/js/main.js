@@ -8,24 +8,23 @@ function toTitleCase(str) {
 function newGraph(options) {
     // fetch graph data from server
     $.ajax({
-        url: '/data?view=' + options.view,
+        url: '/api/v1/data/' + options.view,
         type: 'GET',
         dataType: 'json',
         error: function (e) {
-            alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
+            alert('failed to retrieve ' + options.view + ' data (' + e.status + ')');
         },
         success: function (data) {
             // apply filter function
             if (typeof options.filterFunc === "function") {
                 data.plots = data.plots.filter(options.filterFunc);
             }
-            console.log(data)
             drawGraph(options, data);
         }
     });
 }
 
-let currentChart = null
+let currentChart = null;
 
 function drawGraph(options, data) {
     // clean up previous chart
@@ -113,7 +112,7 @@ function drawGraph(options, data) {
 
     // create new chart
     let ctx = document.getElementById('main-graph').getContext('2d');
-    currentChart = new Chart(ctx, chartConfig)
+    currentChart = new Chart(ctx, chartConfig);
 }
 
 function selectGraph(view) {
@@ -151,4 +150,4 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
 })
 
 // draw initial graph
-selectGraph('month')
+selectGraph('month');

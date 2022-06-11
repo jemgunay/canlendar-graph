@@ -2,6 +2,7 @@ package calendar
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -17,29 +18,29 @@ import (
 func Fetch(calendarName string) (*Results, error) {
 	b, err := ioutil.ReadFile("config/credentials.json")
 	if err != nil {
-		return nil, fmt.Errorf("unable to read client secret file: %s", err)
+		return nil, fmt.Errorf("unable to read client secret file: %w", err)
 	}
 
 	// If modifying these scopes, delete your previously saved token.json
 	config, err := google.ConfigFromJSON(b, gcal.CalendarReadonlyScope)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse client secret file to config: %s", err)
+		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}
 
 	client, err := getClient(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client: %s", err)
+		return nil, fmt.Errorf("failed to get client: %w", err)
 	}
 
 	srv, err := gcal.New(client)
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve Calendar client: %s", err)
+		return nil, fmt.Errorf("unable to retrieve Calendar client: %w", err)
 	}
 
 	// get a list of calendars
 	list, err := srv.CalendarList.List().Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve calendar list: %s", err)
+		return nil, fmt.Errorf("unable to retrieve calendar list: %w", err)
 	}
 
 	// iterate over all calendars and locate the corresponding ID for the target calendar name
@@ -64,11 +65,11 @@ func Fetch(calendarName string) (*Results, error) {
 
 	events, err := req.Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve Events: %s", err)
+		return nil, fmt.Errorf("unable to retrieve Events: %w", err)
 	}
 
 	if len(events.Items) == 0 {
-		return nil, fmt.Errorf("no Events found")
+		return nil, errors.New("no Events found")
 	}
 
 	return &Results{
@@ -100,12 +101,12 @@ func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
-		return nil, fmt.Errorf("unable to read authorization code: %s", err)
+		return nil, fmt.Errorf("unable to read authorization code: %w", err)
 	}
 
 	token, err := config.Exchange(context.TODO(), authCode)
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve token from web: %s", err)
+		return nil, fmt.Errorf("unable to retrieve token from web: %w", err)
 	}
 	return token, nil
 }
@@ -127,7 +128,7 @@ func saveToken(path string, token *oauth2.Token) error {
 	fmt.Printf("Saving credential file to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("unable to cache oauth token: %v", err)
+		return fmt.Errorf("unable to cache oauth token: %w", err)
 	}
 	defer f.Close()
 	return json.NewEncoder(f).Encode(token)

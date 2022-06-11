@@ -17,7 +17,8 @@ make attach_log
 
 ## TODO
 
-- Move secrets to gcloud 
-- Fix month view + clean up dirty diff func 
+- Move secrets to gcloud
+- Fix month view + clean up dirty diff func
+- Paginate/have a scale on day view (way too long to be meaningful)
 - Spinner for loading graphs
 - Improve auth + hooking up to Google API

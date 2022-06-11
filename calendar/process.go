@@ -1,6 +1,7 @@
 package calendar
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -10,24 +11,35 @@ import (
 	gcal "google.golang.org/api/calendar/v3"
 )
 
-// Results is a calendar events result set.
-type Results struct {
-	Events []*gcal.Event
-}
-
-type scale int
+type scale string
 
 // Scale variants for sourcing plot generation.
 const (
-	Month scale = iota
-	Week
-	Day
+	Month scale = "month"
+	Week  scale = "week"
+	Day   scale = "day"
 )
+
+// ValidateScale validates that the provided string can be represented by a supported scale.
+func ValidateScale(s string) (scale, error) {
+	validated := scale(s)
+	switch validated {
+	case Month, Week, Day:
+		return validated, nil
+	default:
+		return validated, errors.New("unsupported scale provided")
+	}
+}
 
 // Plot is a point on a graph.
 type Plot struct {
 	X int64   `json:"t"`
 	Y float64 `json:"y"`
+}
+
+// Results is a calendar events result set.
+type Results struct {
+	Events []*gcal.Event
 }
 
 // GeneratePlots generates graph plot data for a given time scale.
@@ -47,7 +59,7 @@ func (r *Results) GeneratePlots(scale scale) []Plot {
 		}
 
 		if units == -1 {
-			units = 14 // TODO: get this from elsewhere, i.e. DB driven by config page, persisted in memory
+			units = 14
 		}
 
 		// truncate date to scale

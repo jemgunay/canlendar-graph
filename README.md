@@ -2,23 +2,24 @@
 
 A web app for graphing alcohol unit intake documented via Google calendar events. Month, week and day views are available. 
 
-## Run Locally
+## Setup
 
+1) Create a Service Account (SA) for your project
+1) Invite the SA email address to your calendar
+1) Accept the invite for your SA with the `cmd/insert/main.go` script, passing in your calendar's ID:
 ```bash
-go build && ./canlendar-graph
+go run main.go --calendar-id "abcdefghijklmop123456789@group.calendar.google.com"
+2022/06/22 00:53:52 successfully inserted
 ```
 
-## Deploy to GCP
+### Running Locally
+
+1) Create an API key for your Service Account
+1) Download the JSON creds file to the repo root as `credentials.json`
+1) Run with `go run main.go --local`
+
+### Deploy to GCP
 
 ```bash
-make deploy
-make attach_log
+gcloud app deploy
 ```
-
-## TODO
-
-- Move secrets to gcloud
-- Fix month view + clean up dirty diff func
-- Paginate/have a scale on day view (way too long to be meaningful)
-- Spinner for loading graphs
-- Improve auth + hooking up to Google API

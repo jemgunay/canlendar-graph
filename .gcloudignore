@@ -25,5 +25,7 @@
 *.out
 
 *.md
-Makefile
 canlendar-graph
+cmd/
+README.md
+credentials.json

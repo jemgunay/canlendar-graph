@@ -99,8 +99,8 @@ function drawGraph(options, data) {
     if (options.enableGuideline === true) {
         chartConfig.data.datasets.push({
             data: [
-                {y: data.config.guideline, t: data.plots[0].t},
-                {y: data.config.guideline, t: data.plots[data.plots.length - 1].t}
+                {y: data.metadata.guideline, t: data.plots[0].t},
+                {y: data.metadata.guideline, t: data.plots[data.plots.length - 1].t}
             ],
             label: 'Units Guideline (UK)',
             borderColor: 'rgb(109,109,109)',

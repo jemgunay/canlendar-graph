@@ -1,36 +1,60 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
-	"strconv"
+	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/jemgunay/canlendar-graph/calendar"
+	"github.com/jemgunay/canlendar-graph/storage"
 )
 
+const recommendedWeeklyUnits = 14
+
+// API defines the HTTP handlers.
 type API struct {
-	requester    *calendar.Requester
+	storer       storage.Storer
+	calFetcher   calendar.Fetcher
 	weeklyTarget int
 }
 
-func New(requester *calendar.Requester, weeklyTarget int) *API {
+// New initialises an API.
+func New(storer storage.Storer, calFetcher calendar.Fetcher) *API {
 	return &API{
-		requester:    requester,
-		weeklyTarget: weeklyTarget,
+		storer:       storer,
+		calFetcher:   calFetcher,
+		weeklyTarget: recommendedWeeklyUnits,
 	}
 }
 
-// graphResponse represents the config and graph plots returned from the data API.
+// graphResponse represents the graph plots and metadata returned from the data API.
 type graphResponse struct {
-	Plots  []calendar.Plot   `json:"plots"`
-	Config map[string]string `json:"config"`
+	Plots    []Plot            `json:"plots"`
+	Metadata map[string]string `json:"metadata"`
 }
 
-func (a *API) Data(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+type queryPayload struct {
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+}
+
+// Plot is a point on a graph.
+type Plot struct {
+	X int64   `json:"t"`
+	Y float64 `json:"y"`
+}
+
+func (a *API) Query(w http.ResponseWriter, r *http.Request) {
+	/*ctx := r.Context()
+
+	// TODO: read query details from body, i.e. start, end time
+	payload := queryPayload{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Printf("unable to decode request body: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -50,7 +74,7 @@ func (a *API) Data(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// fetch calendar events
-	events, err := a.requester.Fetch()
+	events, err := a.calFetcher.Fetch(ctx, time.Time{}) // TODO: plug start time in here
 	if err != nil {
 		log.Printf("failed to fetch units for \"%s\": %s", scale, err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -64,10 +88,10 @@ func (a *API) Data(w http.ResponseWriter, r *http.Request) {
 
 	// construct response
 	resp := graphResponse{
-		Config: map[string]string{
+		Metadata: map[string]string{
 			"guideline": strconv.Itoa(guidelineUnits),
 		},
-		Plots: events.GeneratePlots(scale, float64(a.weeklyTarget)),
+		//Plots: events.GeneratePlots(scale, float64(a.weeklyTarget)),
 	}
 
 	// JSON encode response
@@ -77,5 +101,84 @@ func (a *API) Data(w http.ResponseWriter, r *http.Request) {
 	if err := encoder.Encode(resp); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
+	}*/
+}
+
+type collectPayload struct {
+	StartTime time.Time `json:"start_time_override"`
+}
+
+func (a *API) Collect(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// get start time override from body
+	payload := collectPayload{}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Printf("unable to decode request body: %s", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
+
+	// if no override, get the timestamp for the last written storage record. If there are no records in storage then
+	// the start of time will be used
+	if payload.StartTime.IsZero() {
+		var err error
+		payload.StartTime, err = a.getLastTimestamp(ctx)
+		if err != nil {
+			log.Printf("failed to read last written timestamp from storage: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// fetch calendar events for time range
+	eventIter, err := a.calFetcher.Fetch(ctx, payload.StartTime)
+	if err != nil {
+		log.Printf("failed to fetch calendar events: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// process calendar events into
+	records := make([]storage.Record, 0, eventIter.Count())
+	for {
+		ev, err := eventIter.Next()
+		if err != nil {
+			if errors.Is(err, calendar.ErrNoMoreEvents) {
+				break
+			}
+			log.Printf("failed to read event: %s", err)
+			continue
+		}
+
+		records = append(records, storage.Record{
+			Time: ev.Date,
+			Fields: map[string]interface{}{
+				"units": ev.Units,
+			},
+		})
+	}
+
+	// persist new events to storage
+	if err := a.storer.Store(ctx, records...); err != nil {
+		log.Printf("failed to persist events to storage: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (a *API) getLastTimestamp(ctx context.Context) (time.Time, error) {
+	startTime, err := a.storer.ReadLastTimestamp(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrNoResults) {
+			// default to the start of time
+			return time.Time{}, nil
+		}
+
+		return time.Time{}, err
+	}
+
+	// add a second to ensure we don't recollect the last point
+	startTime.Add(time.Second)
+	return startTime, nil
 }

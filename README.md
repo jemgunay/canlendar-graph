@@ -14,7 +14,7 @@ go run main.go --calendar-id "abcdefghijklmop123456789@group.calendar.google.com
 
 ### Running Locally
 
-1) Create an API key for your Service Account
+1) Create an API key for the Service Account associated with your calendar
 1) Download the JSON creds file to the repo root as `credentials.json`
 1) Run with `go run main.go --local`
 

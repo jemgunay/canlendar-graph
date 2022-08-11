@@ -12,21 +12,17 @@ import (
 	"github.com/jemgunay/canlendar-graph/storage"
 )
 
-const recommendedWeeklyUnits = 14
-
 // API defines the HTTP handlers.
 type API struct {
-	storer       storage.Storer
-	calFetcher   calendar.Fetcher
-	weeklyTarget int
+	storer     storage.Storer
+	calFetcher calendar.Fetcher
 }
 
 // New initialises an API.
 func New(storer storage.Storer, calFetcher calendar.Fetcher) *API {
 	return &API{
-		storer:       storer,
-		calFetcher:   calFetcher,
-		weeklyTarget: recommendedWeeklyUnits,
+		storer:     storer,
+		calFetcher: calFetcher,
 	}
 }
 
@@ -123,17 +119,24 @@ func (a *API) Collect(w http.ResponseWriter, r *http.Request) {
 	// the start of time will be used
 	if payload.StartTime.IsZero() {
 		var err error
-		payload.StartTime, err = a.getLastTimestamp(ctx)
-		if err != nil {
+		if payload.StartTime, err = a.getLastTimestamp(ctx); err != nil {
 			log.Printf("failed to read last written timestamp from storage: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		// add 24h to ensure we don't recollect the last event
+		payload.StartTime = payload.StartTime.Add(time.Hour * 24)
 	}
 
 	// fetch calendar events for time range
 	eventIter, err := a.calFetcher.Fetch(ctx, payload.StartTime)
 	if err != nil {
+		if err == calendar.ErrNoEventsFound {
+			log.Printf("no new events found since %s", payload.StartTime.Format(time.RFC3339))
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		log.Printf("failed to fetch calendar events: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -178,7 +181,5 @@ func (a *API) getLastTimestamp(ctx context.Context) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	// add a second to ensure we don't recollect the last point
-	startTime.Add(time.Second)
 	return startTime, nil
 }

@@ -20,11 +20,12 @@ type Fetcher interface {
 var _ Fetcher = &Requester{}
 
 type Requester struct {
-	calendarID string
-	service    *gcal.Service
+	calendarID          string
+	service             *gcal.Service
+	unknownDefaultUnits float64
 }
 
-func New(calendarName string, isLocal bool) (*Requester, error) {
+func New(calendarName string, isLocal bool, unknownDefaultUnits float64) (*Requester, error) {
 	options := []option.ClientOption{
 		option.WithScopes(gcal.CalendarReadonlyScope),
 	}
@@ -61,14 +62,16 @@ func New(calendarName string, isLocal bool) (*Requester, error) {
 	}
 
 	return &Requester{
-		calendarID: calendarID,
-		service:    service,
+		calendarID:          calendarID,
+		service:             service,
+		unknownDefaultUnits: unknownDefaultUnits,
 	}, nil
 }
 
 type Event struct {
-	Date  time.Time
-	Units float64
+	Date         time.Time
+	Units        float64
+	unitsUnknown bool
 }
 
 var ErrNoEventsFound = errors.New("no events found")
@@ -92,7 +95,10 @@ func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterat
 		return nil, ErrNoEventsFound
 	}
 
-	return &Iterator{events: events}, nil
+	return &Iterator{
+		events:              events,
+		unknownDefaultUnits: r.unknownDefaultUnits,
+	}, nil
 }
 
 type EventIterator interface {
@@ -101,8 +107,9 @@ type EventIterator interface {
 }
 
 type Iterator struct {
-	events  *gcal.Events
-	current int
+	events              *gcal.Events
+	current             int
+	unknownDefaultUnits float64
 }
 
 var ErrNoMoreEvents = errors.New("no more events to iterate over")
@@ -114,6 +121,10 @@ func (i *Iterator) Next() (Event, error) {
 	ev, err := processEvent(i.events.Items[i.current])
 	if err != nil {
 		return ev, err
+	}
+
+	if ev.unitsUnknown {
+		ev.Units = i.unknownDefaultUnits
 	}
 
 	i.current++
@@ -152,7 +163,7 @@ func processEvent(event *gcal.Event) (Event, error) {
 		return ev, fmt.Errorf("failed to find a units number for event: %s", event.Summary)
 	case "?":
 		// indicates that the consumed number of units was unknown
-		ev.Units = -1
+		ev.unitsUnknown = true
 	default:
 		// parse number of units into float
 		if ev.Units, err = strconv.ParseFloat(match, 64); err != nil {

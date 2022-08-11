@@ -23,7 +23,8 @@ func main() {
 	conf := config.New()
 
 	// create requesters & configure API
-	calendarRequester, err := calendar.New(*calendarName, *local)
+	const recommendedWeeklyUnits = 14
+	calendarRequester, err := calendar.New(*calendarName, *local, recommendedWeeklyUnits)
 	if err != nil {
 		log.Printf("failed to create calendar requester: %s", err)
 		os.Exit(1)

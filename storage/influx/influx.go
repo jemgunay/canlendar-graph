@@ -36,6 +36,14 @@ func New(conf config.Influx) Requester {
 	}
 }
 
+/*
+from(bucket: "life-metrics")
+  |> range(start: -1mo, stop: now())
+  |> filter(fn: (r) => r["_measurement"] == "alcohol_units" and r["_field"] == "units")
+  |> aggregateWindow(every: 1w, fn: sum, createEmpty: true, offset: -3d)
+  |> yield(name: "sum")
+*/
+
 func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([]storage.Record, error) {
 	queryOpts := storage.NewQuery(options...)
 	// TODO: aggregate sum by window

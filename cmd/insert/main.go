@@ -12,7 +12,7 @@ import (
 
 func main() {
 	calendarID := flag.String("calendar-id", "", "the ID of the Units Consumed calendar, e.g. abcdefghijklmop123456789@group.calendar.google.com")
-	credentialsFile := flag.String("creds-file", "../../credentials.json", "the credentials file")
+	credentialsFile := flag.String("creds-file", "./credentials.json", "the credentials file")
 	flag.Parse()
 
 	if *calendarID == "" {

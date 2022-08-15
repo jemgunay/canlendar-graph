@@ -84,6 +84,7 @@ func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterat
 		ShowDeleted(false).
 		SingleEvents(true).
 		OrderBy("startTime").
+		MaxResults(2500).
 		Context(ctx)
 
 	events, err := req.Do()
@@ -99,10 +100,6 @@ func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterat
 		events:              events,
 		unknownDefaultUnits: r.unknownDefaultUnits,
 	}, nil
-}
-
-func (r *Requester) GetDefaultUnits() float64 {
-	return r.unknownDefaultUnits
 }
 
 type EventIterator interface {

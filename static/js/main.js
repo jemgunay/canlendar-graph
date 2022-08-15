@@ -165,4 +165,4 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
 })
 
 // draw initial graph
-selectGraph('month');
+selectGraph('week');

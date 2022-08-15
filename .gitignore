@@ -16,6 +16,8 @@ config/local.env
 
 canlendar-graph
 cmd/insert/insert
+cmd/insert/*.json
+config/credentials.json
 credentials.json
 # Service files
 config/local.env

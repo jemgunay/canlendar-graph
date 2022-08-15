@@ -25,9 +25,7 @@ type Influx struct {
 func New() Config {
 	// attempt to get config environment vars, or default them
 	return Config{
-		Port:        getEnvVarInt("PORT", 8080),
-		WebAppHost:  getEnvVar("WEB_APP_HOST", "http://localhost:8081"),
-		ServiceHost: getEnvVar("SERVICE_HOST", "http://localhost:8080"),
+		Port: getEnvVarInt("PORT", 8080),
 		Influx: Influx{
 			Host:  getEnvVar("INFLUX_HOST", "http://localhost:8086"),
 			Token: getEnvVar("INFLUX_TOKEN", ""),

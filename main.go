@@ -22,7 +22,6 @@ func main() {
 
 	conf := config.New()
 
-	// create requesters & configure API
 	const recommendedWeeklyUnits = 14
 	calendarRequester, err := calendar.New(*calendarName, *local, recommendedWeeklyUnits)
 	if err != nil {

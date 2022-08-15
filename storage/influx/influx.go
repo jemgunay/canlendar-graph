@@ -2,6 +2,7 @@ package influx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -44,48 +45,133 @@ from(bucket: "life-metrics")
   |> yield(name: "sum")
 */
 
-func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([]storage.Record, error) {
-	queryOpts := storage.NewQuery(options...)
-	// TODO: aggregate sum by window
+type aggregationConfig struct {
+	unit   string
+	offset string
+}
 
+func newAggregationConfig(unit, offset string) aggregationConfig {
+	return aggregationConfig{
+		unit:   unit,
+		offset: offset,
+	}
+}
+
+var aggregationLookup = map[storage.Aggregation]aggregationConfig{
+	storage.Day:   newAggregationConfig("1d", "0s"),
+	storage.Week:  newAggregationConfig("1w", "-3d"),
+	storage.Month: newAggregationConfig("1mo", "0s"),
+	storage.Year:  newAggregationConfig("1y", "0s"),
+}
+
+func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([]storage.Plot, error) {
+	queryOpts, err := storage.NewQuery(options...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse query: %w", err)
+	}
+
+	if queryOpts.StartTime.IsZero() {
+		queryOpts.StartTime, err = r.ReadFirstTimestamp(ctx)
+		if err != nil && err != storage.ErrNoResults {
+			return nil, fmt.Errorf("failed to determine start time from available records: %s", err)
+		}
+	}
+
+	aggregate, ok := aggregationLookup[queryOpts.Aggregation]
+	if !ok {
+		return nil, errors.New("unsupported aggregation provided")
+	}
+
+	// build flux query
 	query := `from(bucket: "` + bucket + `")
-	  	|> range(start: ` + queryOpts.StartTime.Format(time.RFC3339) + `, stop: ` + queryOpts.EndTime.Format(time.RFC3339) + `)
+	  	|> range(start: ` + queryOpts.FormatStartTime() + `, stop: ` + queryOpts.FormatEndTime() + `)
 	  	|> filter(fn:(r) =>
-	    	r._measurement == "` + measurement + `"
+	    	r._measurement == "` + measurement + `" and
+			r._field == "units"
 	  	)
-		|> aggregateWindow(every: ` + queryOpts.Aggregation.Unit() + `, fn: sum)`
+		|> aggregateWindow(every: ` + aggregate.unit + `, fn: sum, createEmpty: true, offset: ` + aggregate.offset + `)`
 
 	result, err := r.readClient.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query influx: %s", err)
+		return nil, fmt.Errorf("failed to query influx: %w", err)
 	}
 
-	data := make(map[string]interface{})
+	var records []storage.Plot
 	for result.Next() {
-		data[result.Record().Field()] = result.Record().Value()
+		var val float64
+
+		switch tVal := result.Record().Value().(type) {
+		case float64:
+			val = tVal
+		case nil:
+			val = 0
+		default:
+			log.Printf("unexpected value read from influx: %s (%T)", result.Record().Value(), result.Record().Value())
+			continue
+		}
+
+		records = append(records, storage.Plot{
+			X: result.Record().Time().UnixMilli(),
+			Y: val,
+		})
 	}
 
-	// return data, nil
-	return nil, nil
+	if err := result.Err(); err != nil {
+		return nil, fmt.Errorf("failed to parse influx query response: %w", err)
+	}
+
+	return records, nil
 }
 
 func (r Requester) ReadLastTimestamp(ctx context.Context) (time.Time, error) {
 	query := `from(bucket: "` + bucket + `")
   	|> range(start: 0, stop: now())
   	|> filter(fn:(r) =>
-    	r._measurement == "` + measurement + `"
+    	r._measurement == "` + measurement + `" and
+		r._field == "units"
   	)
   	|> last()`
 
 	result, err := r.readClient.Query(ctx, query)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to query influx: %s", err)
+		return time.Time{}, fmt.Errorf("failed to query influx: %w", err)
 	}
 
+	// TODO: can I use aggregate/group-by here with max value?
 	var t time.Time
 	for result.Next() {
 		t2 := result.Record().Time()
 		if t2.After(t) {
+			t = t2
+		}
+	}
+
+	if t.IsZero() {
+		return time.Time{}, storage.ErrNoResults
+	}
+
+	return t, nil
+}
+
+func (r Requester) ReadFirstTimestamp(ctx context.Context) (time.Time, error) {
+	query := `from(bucket: "` + bucket + `")
+  	|> range(start: 0, stop: now())
+  	|> filter(fn:(r) =>
+    	r._measurement == "` + measurement + `" and
+		r._field == "units"
+  	)
+  	|> first()`
+
+	result, err := r.readClient.Query(ctx, query)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to query influx: %w", err)
+	}
+
+	// TODO: can I use aggregate/group-by here with max value?
+	t := time.Now().UTC()
+	for result.Next() {
+		t2 := result.Record().Time()
+		if t2.Before(t) {
 			t = t2
 		}
 	}
@@ -117,7 +203,7 @@ func (r Requester) Store(ctx context.Context, records ...storage.Record) error {
 	}
 
 	if err := r.writeClient.WritePoint(ctx, points...); err != nil {
-		return fmt.Errorf("writing points to influx failed: %s", err)
+		return fmt.Errorf("writing points to influx failed: %w", err)
 	}
 
 	return nil

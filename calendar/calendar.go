@@ -101,6 +101,10 @@ func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterat
 	}, nil
 }
 
+func (r *Requester) GetDefaultUnits() float64 {
+	return r.unknownDefaultUnits
+}
+
 type EventIterator interface {
 	Next() (Event, error)
 	Count() int

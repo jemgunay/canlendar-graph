@@ -26,68 +26,52 @@ func New(storer storage.Storer, calFetcher calendar.Fetcher) *API {
 	}
 }
 
-// graphResponse represents the graph plots and metadata returned from the data API.
-type graphResponse struct {
-	Plots    []Plot            `json:"plots"`
-	Metadata map[string]string `json:"metadata"`
+type queryResponse struct {
+	Plots    []storage.Plot    `json:"plots"`
+	Metadata queryResponseMeta `json:"metadata"`
 }
 
-type queryPayload struct {
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
+type queryResponseMeta struct {
+	Guideline float64 `json:"guideline,omitempty"`
 }
 
-// Plot is a point on a graph.
-type Plot struct {
-	X int64   `json:"t"`
-	Y float64 `json:"y"`
-}
-
+// Query collects calendar data from storage and returns it as plottable data points.
 func (a *API) Query(w http.ResponseWriter, r *http.Request) {
-	/*ctx := r.Context()
+	ctx := r.Context()
 
-	// TODO: read query details from body, i.e. start, end time
-	payload := queryPayload{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		log.Printf("unable to decode request body: %s", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	query := r.URL.Query()
+	aggregation := storage.Aggregation(query.Get("aggregation"))
+	startTime, _ := time.Parse(time.RFC3339, query.Get("start_time"))
+	endTime, _ := time.Parse(time.RFC3339, query.Get("end_time"))
+
+	opts := []storage.QueryOption{
+		storage.WithAggregation(aggregation),
+		storage.WithStartTime(startTime),
+		storage.WithEndTime(endTime),
 	}
 
-	// extract URL/query string params
-	view := mux.Vars(r)["view"]
-	if view == "" {
-		log.Println("no view string provided in URL route")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	scale, err := calendar.ValidateScale(view)
+	records, err := a.storer.Query(ctx, opts...)
 	if err != nil {
-		log.Printf("failed to parse scale: %s", err)
+		log.Printf("failed to query storage: %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	// fetch calendar events
-	events, err := a.calFetcher.Fetch(ctx, time.Time{}) // TODO: plug start time in here
-	if err != nil {
-		log.Printf("failed to fetch units for \"%s\": %s", scale, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	guidelineUnits := a.weeklyTarget
-	if scale == calendar.Month {
+	guidelineUnits := float64(14)
+	switch aggregation {
+	case storage.Day:
+		guidelineUnits = 0
+	case storage.Month:
 		guidelineUnits *= 4
+	case storage.Year:
+		guidelineUnits *= 4 * 12
 	}
 
-	// construct response
-	resp := graphResponse{
-		Metadata: map[string]string{
-			"guideline": strconv.Itoa(guidelineUnits),
+	resp := queryResponse{
+		Metadata: queryResponseMeta{
+			Guideline: guidelineUnits,
 		},
-		//Plots: events.GeneratePlots(scale, float64(a.weeklyTarget)),
+		Plots: records,
 	}
 
 	// JSON encode response
@@ -97,13 +81,15 @@ func (a *API) Query(w http.ResponseWriter, r *http.Request) {
 	if err := encoder.Encode(resp); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	}*/
+	}
 }
 
 type collectPayload struct {
 	StartTime time.Time `json:"start_time_override"`
 }
 
+// Collect scrapes the Google calendar API for new events (i.e. those created since the last scraped event) and writes
+// them to storage.
 func (a *API) Collect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -170,6 +156,8 @@ func (a *API) Collect(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// getLastTimestamp reads the last written unit timestamp from storage. If there were no results in storage, then the
+// value representing the start of time is returned.
 func (a *API) getLastTimestamp(ctx context.Context) (time.Time, error) {
 	startTime, err := a.storer.ReadLastTimestamp(ctx)
 	if err != nil {

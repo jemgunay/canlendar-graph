@@ -6,9 +6,17 @@ function toTitleCase(str) {
 }
 
 function newGraph(options) {
+    const currentDate = new Date();
+
     // fetch graph data from server
     $.ajax({
-        url: '/api/v1/data/' + options.view,
+        url: '/api/v1/query',
+        data: {
+            // TODO: plug in start time/end time
+            "aggregation": options.view,
+            //"start_time": "",
+            "end_time": currentDate.toISOString(),
+        },
         type: 'GET',
         dataType: 'json',
         error: function (e) {
@@ -117,6 +125,13 @@ function drawGraph(options, data) {
 
 function selectGraph(view) {
     switch (view) {
+        case 'year':
+            newGraph({
+                view: 'year',
+                type: 'line',
+                enableGuideline: true
+            });
+            break;
         case 'month':
             newGraph({
                 view: 'month',

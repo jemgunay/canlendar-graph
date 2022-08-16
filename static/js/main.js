@@ -98,7 +98,7 @@ function drawGraph(options, data) {
                 labels: {
                     fontColor: 'rgb(255, 99, 132)'
                 },
-                position: 'right'
+                position: 'top'
             }
         }
     };

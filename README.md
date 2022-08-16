@@ -1,6 +1,13 @@
 # Canlendar Graph
 
-A web app for graphing alcohol unit intake documented via Google calendar events. Month, week and day views are available. 
+A web app for graphing alcohol unit intake documented via Google calendar events. Year, month, week and day views are available.
+
+## Implementation
+
+* Deployed to Google Cloud Run and scales to zero.
+* File server for serving static web app files.
+* `/api/v1/collect`: Endpoint for scraping alcohol unit data from calendar events via the Google Calendar API; this unit data is then stored in InfluxDB. This endpoint is executed on an interval via Cloud Scheduler. 
+* `/api/v1/query`: Endpoint for querying alcohol unit consumption data stored in InfluxDB.
 
 ## Setup
 

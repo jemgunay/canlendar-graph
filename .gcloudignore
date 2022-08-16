@@ -30,3 +30,6 @@ canlendar-graph
 cmd/
 README.md
 credentials.json
+config/*.json
+config/*.env
+config/*.sh

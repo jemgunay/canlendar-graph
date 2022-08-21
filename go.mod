@@ -3,6 +3,7 @@ module github.com/jemgunay/canlendar-graph
 go 1.14
 
 require (
+	github.com/golang/mock v1.4.4
 	github.com/gorilla/mux v1.8.0
 	github.com/influxdata/influxdb-client-go/v2 v2.9.2
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777

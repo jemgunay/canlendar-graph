@@ -15,7 +15,7 @@ import (
 	"github.com/jemgunay/canlendar-graph/config"
 )
 
-var _ storage.Storer = &Requester{}
+var _ storage.Storer = (*Requester)(nil)
 
 const (
 	bucket      = "life-metrics"
@@ -75,7 +75,7 @@ func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([
 	if queryOpts.StartTime.IsZero() {
 		queryOpts.StartTime, err = r.ReadFirstTimestamp(ctx)
 		if err != nil && err != storage.ErrNoResults {
-			return nil, fmt.Errorf("failed to determine start time from available records: %s", err)
+			return nil, fmt.Errorf("failed to determine start time from available records: %w", err)
 		}
 	}
 

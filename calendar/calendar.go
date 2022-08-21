@@ -13,24 +13,32 @@ import (
 	"google.golang.org/api/option"
 )
 
+//go:generate mockgen -source=calendar.go -destination=mocks/calendar.go
+
+// MaxRecommendedWeeklyUnits is the recommended maximum weekly unit intake.
+const MaxRecommendedWeeklyUnits = 14
+
+// Fetcher fetches all calendar events since startTime in an iterable format.
 type Fetcher interface {
 	Fetch(ctx context.Context, startTime time.Time) (EventIterator, error)
 }
 
-var _ Fetcher = &Requester{}
+var _ Fetcher = (*Requester)(nil)
 
+// Requester is a HTTP Fetcher for collecting calendar events via the Google Calendar API.
 type Requester struct {
-	calendarID          string
-	service             *gcal.Service
-	unknownDefaultUnits float64
+	calendarID string
+	service    *gcal.Service
 }
 
-func New(calendarName string, isLocal bool, unknownDefaultUnits float64) (*Requester, error) {
+// New initialises a new Requester for a given Google calendar name. It supports reading credentials from a file (for
+// local dev) or from env defaults (hosted via a CSP).
+func New(calendarName string, isLocal bool) (*Requester, error) {
 	options := []option.ClientOption{
 		option.WithScopes(gcal.CalendarReadonlyScope),
 	}
 
-	// if running locally, read credentials from file. Otherwise use env defaults
+	// if running locally, read credentials from file. Otherwise, use env defaults
 	if isLocal {
 		log.Println("reading auth config from credentials.json file")
 		options = append(options, option.WithCredentialsFile("config/credentials.json"))
@@ -62,21 +70,22 @@ func New(calendarName string, isLocal bool, unknownDefaultUnits float64) (*Reque
 	}
 
 	return &Requester{
-		calendarID:          calendarID,
-		service:             service,
-		unknownDefaultUnits: unknownDefaultUnits,
+		calendarID: calendarID,
+		service:    service,
 	}, nil
 }
 
+// Event represents a processed alcohol unit calendar event.
 type Event struct {
-	Date         time.Time
-	Units        float64
-	unitsUnknown bool
+	Date  time.Time
+	Units float64
 }
 
+// ErrNoEventsFound indicates that no events for the given calendar could be found within the specified start time and
+// the current time.
 var ErrNoEventsFound = errors.New("no events found")
 
-// Fetch fetches a set of events for a given calendar name.
+// Fetch fetches a set of events for a given calendar name timestamped after the provided startTime.
 func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterator, error) {
 	// request all Events for target calendar
 	req := r.service.Events.List(r.calendarID).
@@ -97,24 +106,27 @@ func (r *Requester) Fetch(ctx context.Context, startTime time.Time) (EventIterat
 	}
 
 	return &Iterator{
-		events:              events,
-		unknownDefaultUnits: r.unknownDefaultUnits,
+		events: events,
 	}, nil
 }
 
+// EventIterator is a set of Event results, where Next returns the next event and Count returns the total number of
+// events.
 type EventIterator interface {
 	Next() (Event, error)
 	Count() int
 }
 
+// Iterator is an iterable layer of abstraction above Google Calendar API events.
 type Iterator struct {
-	events              *gcal.Events
-	current             int
-	unknownDefaultUnits float64
+	events  *gcal.Events
+	current int
 }
 
+// ErrNoMoreEvents indicates that there are no more events to iterate over.
 var ErrNoMoreEvents = errors.New("no more events to iterate over")
 
+// Next returns the next calendar event, processed into alcohol units.
 func (i *Iterator) Next() (Event, error) {
 	if i.current == len(i.events.Items) {
 		return Event{}, ErrNoMoreEvents
@@ -124,22 +136,20 @@ func (i *Iterator) Next() (Event, error) {
 		return ev, err
 	}
 
-	if ev.unitsUnknown {
-		ev.Units = i.unknownDefaultUnits
-	}
-
 	i.current++
 	return ev, nil
 }
 
+// Count returns the total count of iterable items.
 func (i *Iterator) Count() int {
 	return len(i.events.Items)
 }
 
 var summaryUnitsRegex = regexp.MustCompile(`(?m)[\d?]*\.?\d*`)
 
-// processEvent processes the date and number of units from the calendar event summary. Returns a units count of -1 if
-// the unit amount was specified as unknown in the event summary, i.e. "?" instead of a number.
+// processEvent processes the date and number of units from the calendar event summary. Sets the unit count to the
+// maximum recommended weekly volume the unit amount was specified as unknown in the event summary, i.e. "?" instead of
+// a number.
 func processEvent(event *gcal.Event) (Event, error) {
 	ev := Event{}
 
@@ -163,8 +173,8 @@ func processEvent(event *gcal.Event) (Event, error) {
 		// invalid summary provided
 		return ev, fmt.Errorf("failed to find a units number for event: %s", event.Summary)
 	case "?":
-		// indicates that the consumed number of units was unknown
-		ev.unitsUnknown = true
+		// default unknown units to the weekly maximum
+		ev.Units = MaxRecommendedWeeklyUnits
 	default:
 		// parse number of units into float
 		if ev.Units, err = strconv.ParseFloat(match, 64); err != nil {

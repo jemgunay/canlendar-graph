@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=storage.go -destination=mocks/storage.go
+
 // Record is a generic collection dataset retrieved and stored by a Storer.
 type Record struct {
 	Time   time.Time
@@ -63,20 +65,24 @@ func NewQuery(opts ...QueryOption) (QuerySet, error) {
 	return *q, nil
 }
 
+// QueryOption is used to provide options to storage queries.
 type QueryOption func(set *QuerySet)
 
+// WithStartTime defines the query start time to use.
 func WithStartTime(startTime time.Time) QueryOption {
 	return func(set *QuerySet) {
 		set.StartTime = startTime.UTC()
 	}
 }
 
+// WithEndTime defines the query end time to use.
 func WithEndTime(endTime time.Time) QueryOption {
 	return func(set *QuerySet) {
 		set.EndTime = endTime.UTC()
 	}
 }
 
+// Aggregation describes how storage data should be aggregated.
 type Aggregation string
 
 const (
@@ -86,10 +92,12 @@ const (
 	Year  Aggregation = "year"
 )
 
+// String gets the aggregation name.
 func (a Aggregation) String() string {
 	return string(a)
 }
 
+// IsValid determines if the query aggregation is supported.
 func (a Aggregation) IsValid() bool {
 	switch a {
 	case Day, Week, Month, Year:
@@ -99,6 +107,7 @@ func (a Aggregation) IsValid() bool {
 	}
 }
 
+// WithAggregation defines the query aggregation to use.
 func WithAggregation(aggregation Aggregation) QueryOption {
 	return func(set *QuerySet) {
 		set.Aggregation = aggregation

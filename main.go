@@ -22,8 +22,7 @@ func main() {
 
 	conf := config.New()
 
-	const recommendedWeeklyUnits = 14
-	calendarRequester, err := calendar.New(*calendarName, *local, recommendedWeeklyUnits)
+	calendarRequester, err := calendar.New(*calendarName, *local)
 	if err != nil {
 		log.Printf("failed to create calendar requester: %s", err)
 		os.Exit(1)

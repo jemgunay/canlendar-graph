@@ -57,14 +57,15 @@ func (a *API) Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	guidelineUnits := float64(14)
+	// default 0 units for Day aggregation - only show a guideline for Week aggregation and higher
+	var guidelineUnits float64
 	switch aggregation {
-	case storage.Day:
-		guidelineUnits = 0
+	case storage.Week:
+		guidelineUnits = calendar.MaxRecommendedWeeklyUnits
 	case storage.Month:
-		guidelineUnits *= 4
+		guidelineUnits = calendar.MaxRecommendedWeeklyUnits * 4
 	case storage.Year:
-		guidelineUnits *= 4 * 12
+		guidelineUnits = calendar.MaxRecommendedWeeklyUnits * 4 * 12
 	}
 
 	resp := queryResponse{
@@ -81,6 +82,7 @@ func (a *API) Query(w http.ResponseWriter, r *http.Request) {
 	if err := encoder.Encode(resp); err != nil {
 		log.Printf("failed to JSON encode response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }
 

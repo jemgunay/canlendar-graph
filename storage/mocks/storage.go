@@ -56,6 +56,21 @@ func (mr *MockStorerMockRecorder) Query(ctx interface{}, options ...interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockStorer)(nil).Query), varargs...)
 }
 
+// ReadFirstTimestamp mocks base method.
+func (m *MockStorer) ReadFirstTimestamp(ctx context.Context) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadFirstTimestamp", ctx)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadFirstTimestamp indicates an expected call of ReadFirstTimestamp.
+func (mr *MockStorerMockRecorder) ReadFirstTimestamp(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFirstTimestamp", reflect.TypeOf((*MockStorer)(nil).ReadFirstTimestamp), ctx)
+}
+
 // ReadLastTimestamp mocks base method.
 func (m *MockStorer) ReadLastTimestamp(ctx context.Context) (time.Time, error) {
 	m.ctrl.T.Helper()

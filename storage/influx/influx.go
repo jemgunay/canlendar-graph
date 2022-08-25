@@ -37,14 +37,6 @@ func New(conf config.Influx) Requester {
 	}
 }
 
-/*
-from(bucket: "life-metrics")
-  |> range(start: -1mo, stop: now())
-  |> filter(fn: (r) => r["_measurement"] == "alcohol_units" and r["_field"] == "units")
-  |> aggregateWindow(every: 1w, fn: sum, createEmpty: true, offset: -3d)
-  |> yield(name: "sum")
-*/
-
 type aggregationConfig struct {
 	unit   string
 	offset string
@@ -57,6 +49,7 @@ func newAggregationConfig(unit, offset string) aggregationConfig {
 	}
 }
 
+// maps aggregation to their Influx-query segments.
 var aggregationLookup = map[storage.Aggregation]aggregationConfig{
 	storage.Day:   newAggregationConfig("1d", "0s"),
 	storage.Week:  newAggregationConfig("1w", "-3d"),
@@ -64,6 +57,8 @@ var aggregationLookup = map[storage.Aggregation]aggregationConfig{
 	storage.Year:  newAggregationConfig("1y", "0s"),
 }
 
+// Query queries Influx given the provided options. Returns storage.ErrNoResults if no records are available for the
+// given time range.
 func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([]storage.Plot, error) {
 	log.Printf("executing influx query")
 
@@ -72,9 +67,13 @@ func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([
 		return nil, fmt.Errorf("failed to parse query: %w", err)
 	}
 
+	// if no start time is provided, default it to the oldest record's timestamp
 	if queryOpts.StartTime.IsZero() {
 		queryOpts.StartTime, err = r.ReadFirstTimestamp(ctx)
-		if err != nil && err != storage.ErrNoResults {
+		if err != nil {
+			if err != storage.ErrNoResults {
+				return nil, storage.ErrNoResults
+			}
 			return nil, fmt.Errorf("failed to determine start time from available records: %w", err)
 		}
 	}
@@ -114,6 +113,7 @@ func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([
 		}
 
 		records = append(records, storage.Plot{
+			// millis required by ChartJS
 			X: result.Record().Time().UnixMilli(),
 			Y: units,
 		})
@@ -123,9 +123,15 @@ func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([
 		return nil, fmt.Errorf("failed to parse influx query response: %w", err)
 	}
 
+	if len(records) == 0 {
+		return nil, storage.ErrNoResults
+	}
+
 	return records, nil
 }
 
+// ReadLastTimestamp returns the timestamp for the record with the newest timestamp. storage.ErrNoResults is returned
+// if there are no records.
 func (r Requester) ReadLastTimestamp(ctx context.Context) (time.Time, error) {
 	log.Printf("reading last record timestamp from influx")
 
@@ -158,6 +164,8 @@ func (r Requester) ReadLastTimestamp(ctx context.Context) (time.Time, error) {
 	return t, nil
 }
 
+// ReadFirstTimestamp returns the timestamp for the record with the oldest timestamp. storage.ErrNoResults is returned
+// if there are no records.
 func (r Requester) ReadFirstTimestamp(ctx context.Context) (time.Time, error) {
 	log.Printf("reading first record timestamp from influx")
 
@@ -190,6 +198,7 @@ func (r Requester) ReadFirstTimestamp(ctx context.Context) (time.Time, error) {
 	return t, nil
 }
 
+// Store writes the set of records to Influx as a batch of points.
 func (r Requester) Store(ctx context.Context, records ...storage.Record) error {
 	log.Printf("storing records to influx: %d", len(records))
 

@@ -6,8 +6,16 @@ A web app for graphing alcohol unit intake documented via Google calendar events
 
 * Deployed to Google Cloud Run and scales to zero.
 * File server for serving static web app files.
-* `/api/v1/collect`: Endpoint for scraping alcohol unit data from calendar events via the Google Calendar API; this unit data is then stored in InfluxDB. This endpoint is executed on an interval via Cloud Scheduler. 
-* `/api/v1/query`: Endpoint for querying alcohol unit consumption data stored in InfluxDB.
+* Endpoint for scraping alcohol unit data from calendar events via the Google Calendar API; this unit data is then stored in InfluxDB. This endpoint is executed on an interval via Cloud Scheduler.
+```bash
+curl -i -XPOST "localhost:8080/api/v1/collect" -d '{}'
+curl -i -XPOST "localhost:8080/api/v1/collect" -d '{"start_time_override": "2009-11-10T23:00:00Z"}'
+```
+* Endpoint for querying alcohol unit consumption data stored in InfluxDB. Supported aggregations are `year`, `month`, `week` and `day`.
+```bash
+curl -i -XGET "localhost:8080/api/v1/query?aggregation=week&end_time=2022-08-25T21:42:09Z"
+curl -i -XGET "localhost:8080/api/v1/query?aggregation=day&start_time=2022-08-10T21:42:09Z&end_time=2022-08-25T21:42:09Z"
+```
 
 ## Setup
 

@@ -1,30 +1,30 @@
-# Golang CircleCI 2.0 configuration file
-version: 2
+version: 2.1
+orbs:
+  go: circleci/go@1.7.1
 jobs:
   build:
-    docker:
-      - image: circleci/golang:1.19
-    working_directory: /go/src/github.com/jemgunay/canlendar-graph
+    executor:
+      name: go/default
+      tag: '1.19'
     steps:
       - checkout
-      - run: go build -race
-
-  verify:
-    docker:
-      - image: circleci/golang:1.19
-    working_directory: /go/src/github.com/jemgunay/canlendar-graph
-    steps:
-      - checkout
-      - run: go get -u golang.org/x/lint/golint
-      - run: golint $(go list ./... | grep -v /vendor/)
+      - go/load-cache
+      - go/mod-download
+      - go/save-cache
 
   test:
-    docker:
-      - image: circleci/golang:1.19
-    working_directory: /go/src/github.com/jemgunay/canlendar-graph
+    executor:
+      name: go/default
+      tag: '1.19'
     steps:
       - checkout
-      - run: go test -v -race ./...
+      - go/load-cache
+      - go/mod-download
+      - go/save-cache
+      - go/test:
+          covermode: atomic
+          failfast: true
+          race: true
 
 # define order of job execution
 workflows:
@@ -32,9 +32,6 @@ workflows:
   build_and_test:
     jobs:
       - build
-      - verify:
-          requires:
-            - build
       - test:
           requires:
-            - verify
+            - build

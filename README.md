@@ -1,6 +1,6 @@
 # Canlendar Graph
 
-[![CircleCI](https://circleci.com/gh/jemgunay/canlendar-graph/tree/master.svg?style=svg)](https://circleci.com/gh/jemgunay/canlendar-graph/tree/master)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/jemgunay/canlendar-graph/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/jemgunay/canlendar-graph/tree/master)
 
 A web app for graphing alcohol unit intake documented via Google calendar events. Year, month, week and day views are
 available.

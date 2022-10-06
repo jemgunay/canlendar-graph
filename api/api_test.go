@@ -77,31 +77,6 @@ func TestAPI_Query(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// generate 100 events for the calendar event iterator
-	/*mockIter := mock_calendar.NewMockEventIterator(ctrl)
-	eventCount := 100
-	mockIter.EXPECT().Count().Return(eventCount).AnyTimes()
-	var current int
-	mockIter.EXPECT().Next().DoAndReturn(
-		func() (calendar.Event, error) {
-			fmt.Println(current)
-
-			if current == eventCount {
-				return calendar.Event{}, calendar.ErrNoMoreEvents
-			}
-
-			ev := calendar.Event{
-				Date:  now.Add(-time.Hour * 24 * time.Duration(current)),
-				Units: float64(current % 10),
-			}
-			current++
-			return ev, nil
-		},
-	).AnyTimes()
-
-	mockCalendar := mock_calendar.NewMockFetcher(ctrl)
-	mockCalendar.EXPECT().Fetch(gomock.Any(), gomock.Any()).Return(mockIter, nil).Times(1)*/
-
 	cases := []struct {
 		name        string
 		aggregation string

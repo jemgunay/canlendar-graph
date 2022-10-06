@@ -1,99 +1,51 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
+	"github.com/gorilla/mux"
+	"github.com/jemgunay/canlendar-graph/api"
 	"github.com/jemgunay/canlendar-graph/calendar"
+	"github.com/jemgunay/canlendar-graph/config"
+	"github.com/jemgunay/canlendar-graph/storage/influx"
 )
-
-var calendarName = "Units Consumed"
 
 func main() {
 	// process flags
-	port := flag.Int("port", 8080, "the HTTP server port")
-	flag.StringVar(&calendarName, "calendar_name", calendarName, "the name of the calendar documenting units")
+	calendarName := flag.String("calendar-name", "Units Consumed", "the name of the calendar documenting units")
+	local := flag.Bool("local", false, "use local credentials.json file rather than default env creds")
 	flag.Parse()
 
-	// define handlers
+	conf := config.New()
+
+	calendarRequester, err := calendar.New(*calendarName, *local)
+	if err != nil {
+		log.Printf("failed to create calendar requester: %s", err)
+		os.Exit(1)
+	}
+
+	influxRequester := influx.New(conf.Influx)
+	apiHandlers := api.New(influxRequester, calendarRequester)
+
+	router := mux.NewRouter()
+	// API handlers
+	router.HandleFunc("/api/v1/query", apiHandlers.Query).Methods(http.MethodGet)
+	router.HandleFunc("/api/v1/collect", apiHandlers.Collect).Methods(http.MethodPost)
+
+	// HTTP file server
 	staticFileHandler := http.StripPrefix("/static/", http.FileServer(http.Dir("static/")))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// reroute calls to the root to index.html via the file server
-		if r.URL.Path != "/" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = "/static/"
 		staticFileHandler.ServeHTTP(w, r)
 	})
-	http.Handle("/static/", staticFileHandler)
-	http.HandleFunc("/data", dataHandler)
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	// start HTTP server
-	log.Printf("starting up HTTP server on port %d", *port)
-	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
-	log.Printf("server shut down: %s", err)
-}
-
-type graphResponse struct {
-	Plots  []calendar.Plot   `json:"plots"`
-	Config map[string]string `json:"config"`
-}
-
-const recommendedWeeklyUnits = 14
-
-// serves up JSON data to be consumed by the root page
-func dataHandler(w http.ResponseWriter, r *http.Request) {
-	// extract query string params
-	pretty := r.URL.Query().Get("pretty") == "true"
-	view := r.URL.Query().Get("view")
-	if view == "" {
-		log.Println("no view query string provided")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// fetch calendar events
-	events, err := calendar.Fetch(calendarName)
-	if err != nil {
-		log.Printf("failed to fetch units for \"%s\": %s", view, err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	guidelineUnits := recommendedWeeklyUnits
-	if view == "month" {
-		guidelineUnits *= 4
-	}
-
-	// construct response
-	resp := graphResponse{
-		Config: map[string]string{
-			"guideline": strconv.Itoa(guidelineUnits),
-		},
-	}
-
-	switch view {
-	case "month":
-		resp.Plots = events.GeneratePlots(calendar.Month)
-	case "week":
-		resp.Plots = events.GeneratePlots(calendar.Week)
-	case "day":
-		resp.Plots = events.GeneratePlots(calendar.Day)
-	}
-
-	// JSON encode response
-	w.Header().Set("Content-Type", "application/json")
-	encoder := json.NewEncoder(w)
-	encoder.SetEscapeHTML(false)
-	if pretty {
-		encoder.SetIndent("", "\t")
-	}
-	if err := encoder.Encode(resp); err != nil {
-		log.Printf("failed to JSON encode response: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	log.Printf("starting HTTP server on port %d", conf.Port)
+	err = http.ListenAndServe(":"+strconv.Itoa(conf.Port), router)
+	log.Printf("HTTP server shut down: %s", err)
 }

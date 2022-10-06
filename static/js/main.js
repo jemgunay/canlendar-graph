@@ -6,26 +6,33 @@ function toTitleCase(str) {
 }
 
 function newGraph(options) {
+    const currentDate = new Date();
+
     // fetch graph data from server
     $.ajax({
-        url: '/data?view=' + options.view,
+        url: '/api/v1/query',
+        data: {
+            // TODO: plug in start time/end time
+            "aggregation": options.view,
+            //"start_time": "",
+            "end_time": currentDate.toISOString(),
+        },
         type: 'GET',
         dataType: 'json',
         error: function (e) {
-            alert('failed to retrieve ' + options.view + ' data (' + e.status + ')')
+            alert('failed to retrieve ' + options.view + ' data (' + e.status + ')');
         },
         success: function (data) {
             // apply filter function
             if (typeof options.filterFunc === "function") {
                 data.plots = data.plots.filter(options.filterFunc);
             }
-            console.log(data)
             drawGraph(options, data);
         }
     });
 }
 
-let currentChart = null
+let currentChart = null;
 
 function drawGraph(options, data) {
     // clean up previous chart
@@ -91,7 +98,7 @@ function drawGraph(options, data) {
                 labels: {
                     fontColor: 'rgb(255, 99, 132)'
                 },
-                position: 'right'
+                position: 'top'
             }
         }
     };
@@ -100,8 +107,8 @@ function drawGraph(options, data) {
     if (options.enableGuideline === true) {
         chartConfig.data.datasets.push({
             data: [
-                {y: data.config.guideline, t: data.plots[0].t},
-                {y: data.config.guideline, t: data.plots[data.plots.length - 1].t}
+                {y: data.metadata.guideline, t: data.plots[0].t},
+                {y: data.metadata.guideline, t: data.plots[data.plots.length - 1].t}
             ],
             label: 'Units Guideline (UK)',
             borderColor: 'rgb(109,109,109)',
@@ -113,11 +120,18 @@ function drawGraph(options, data) {
 
     // create new chart
     let ctx = document.getElementById('main-graph').getContext('2d');
-    currentChart = new Chart(ctx, chartConfig)
+    currentChart = new Chart(ctx, chartConfig);
 }
 
 function selectGraph(view) {
     switch (view) {
+        case 'year':
+            newGraph({
+                view: 'year',
+                type: 'line',
+                enableGuideline: true
+            });
+            break;
         case 'month':
             newGraph({
                 view: 'month',
@@ -151,4 +165,4 @@ $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
 })
 
 // draw initial graph
-selectGraph('month')
+selectGraph('week');

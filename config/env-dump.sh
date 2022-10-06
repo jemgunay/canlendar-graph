@@ -1,0 +1,4 @@
+echo "PORT: ${PORT}"
+echo "INFLUX_HOST: ${INFLUX_HOST}"
+echo "INFLUX_TOKEN: ${INFLUX_TOKEN}"
+echo "INFLUX_ORG: ${INFLUX_ORG}"

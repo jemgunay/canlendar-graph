@@ -24,6 +24,12 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+.idea/
 *.md
-Makefile
 canlendar-graph
+cmd/
+README.md
+credentials.json
+config/*.json
+config/*.env
+config/*.sh

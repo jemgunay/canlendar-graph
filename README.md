@@ -27,8 +27,7 @@ curl -i -XPOST "localhost:8080/api/v1/collect" -d '{}'
 curl -i -XPOST "localhost:8080/api/v1/collect" -d '{"start_time_override": "2009-11-10T23:00:00Z"}'
 ```
 
-* Endpoint for querying alcohol unit consumption data stored in InfluxDB. Supported aggregations are `year`, `month`
-  , `week` and `day`.
+* Endpoint for querying alcohol unit consumption data stored in InfluxDB. Supported aggregations are `year`, `month`, `week` and `day`.
 
 ```bash
 curl -i -XGET "localhost:8080/api/v1/query?aggregation=week&end_time=2022-08-25T21:42:09Z"

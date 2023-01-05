@@ -77,10 +77,12 @@ function drawGraph(options, data) {
                         unit: options.view,
                         isoWeekday: true,
                         displayFormats: {
+                            year: 'YYYY',
                             month: 'MMM YYYY',
                             week: 'D MMM (ww)',
                             day: 'D MMM'
-                        }
+                        },
+                        tooltipFormat: options.tooltipFormat
                     }
                 }],
                 yAxes: [{
@@ -129,21 +131,24 @@ function selectGraph(view) {
             newGraph({
                 view: 'year',
                 type: 'line',
-                enableGuideline: true
+                enableGuideline: true,
+                tooltipFormat: 'YYYY'
             });
             break;
         case 'month':
             newGraph({
                 view: 'month',
                 type: 'line',
-                enableGuideline: true
+                enableGuideline: true,
+                tooltipFormat: 'MMM YYYY'
             });
             break;
         case 'week':
             newGraph({
                 view: 'week',
                 type: 'line',
-                enableGuideline: true
+                enableGuideline: true,
+                tooltipFormat: 'MMM D, YYYY'
             });
             break;
         case 'day':
@@ -152,7 +157,8 @@ function selectGraph(view) {
                 type: 'scatter',
                 filterFunc: function (plot) {
                     return plot.y !== 0;
-                }
+                },
+                tooltipFormat: 'MMM D, YYYY'
             });
             break;
     }

@@ -20,6 +20,7 @@ func main() {
 	apiHandlers := api.New(&demoStore{}, nil)
 
 	router := mux.NewRouter()
+	router.Use(allowCORSMiddleware)
 	router.HandleFunc("/api/v1/query", apiHandlers.Query).Methods(http.MethodGet)
 
 	// HTTP file server
@@ -34,6 +35,13 @@ func main() {
 	log.Printf("starting demo HTTP server on port %d", conf.Port)
 	err := http.ListenAndServe(":"+strconv.Itoa(conf.Port), router)
 	log.Printf("demo HTTP server shut down: %s", err)
+}
+
+func allowCORSMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		h.ServeHTTP(w, r)
+	})
 }
 
 var _ storage.Storer = (*demoStore)(nil)

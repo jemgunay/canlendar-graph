@@ -55,7 +55,7 @@ go run main.go --calendar-id "abcdefghijklmop123456789@group.calendar.google.com
 ### Deploy to GCP
 
 ```bash
-gcloud run deploy
+make deploy
 ```
 
 ## Demo
@@ -63,7 +63,7 @@ gcloud run deploy
 A demo version of the app with mocked data for all available views (navigate to `http://localhost:8080`).
 
 ```bash
-cd cmd/bash
+cd cmd/demo
 go run main.go
 # Navigate to http://localhost:8080
 ```

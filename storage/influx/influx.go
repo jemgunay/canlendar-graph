@@ -112,9 +112,23 @@ func (r Requester) Query(ctx context.Context, options ...storage.QueryOption) ([
 			continue
 		}
 
+		// influx returns the upper of the aggregated date range, so subtract to give us the start date (i.e. first day
+		// of the year, month, day - rather than the last)
+		recordTime := result.Record().Time()
+		switch queryOpts.Aggregation {
+		case storage.Year:
+			recordTime = recordTime.AddDate(-1, 0, 0)
+		case storage.Month:
+			recordTime = recordTime.AddDate(0, -1, 0)
+		case storage.Week:
+			recordTime = recordTime.AddDate(0, 0, -7)
+		case storage.Day:
+			recordTime = recordTime.AddDate(0, 0, -1)
+		}
+
 		records = append(records, storage.Plot{
 			// millis required by ChartJS
-			X: result.Record().Time().UnixMilli(),
+			X: recordTime.UnixMilli(),
 			Y: units,
 		})
 	}
